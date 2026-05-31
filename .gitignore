@@ -1,0 +1,15 @@
+node_modules/
+web/node_modules/
+web/dist/
+functions/node_modules/
+functions/lib/
+.env
+.env.*
+!.env.production.template
+functions/.secret.local
+.emulator-data/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+storage.rules.lock
