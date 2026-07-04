@@ -2,7 +2,7 @@ name: Claude Issue Handler
 
 on:
   issues:
-    types: [assigned, labeled]
+    types: [labeled]
   issue_comment:
     types: [created]
 
@@ -30,7 +30,6 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          assignee_trigger: 'claude'
           label_trigger: 'claude'
           branch_prefix: 'claude/'
           track_progress: true
