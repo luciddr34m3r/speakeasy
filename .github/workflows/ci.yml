@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   typecheck-web:
     name: Typecheck Web
@@ -38,7 +42,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    needs: [typecheck-web]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,7 +55,6 @@ jobs:
   test-unit-web:
     name: Unit Tests (Web)
     runs-on: ubuntu-latest
-    needs: [typecheck-web]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,7 +75,6 @@ jobs:
   test-unit-functions:
     name: Unit Tests (Functions)
     runs-on: ubuntu-latest
-    needs: [typecheck-functions]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -94,7 +95,6 @@ jobs:
   test-rules:
     name: Firestore Rules Tests
     runs-on: ubuntu-latest
-    needs: [typecheck-functions]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -107,17 +107,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+      - name: Cache Firestore emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firestore-emulator-${{ runner.os }}-v1
       - name: Run rules tests under the Firestore emulator
-        run: firebase emulators:exec --only firestore --project demo-speakeasy 'npm run test:rules --prefix functions'
+        run: npx firebase-tools emulators:exec --only firestore --project demo-speakeasy 'npm run test:rules --prefix functions'
         env:
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
 
+  # No needs: — build only consumes source; required checks still gate the merge
   build:
     name: Build Web
     runs-on: ubuntu-latest
-    needs: [lint, test-unit-web]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -159,8 +162,22 @@ jobs:
         with:
           name: web-dist
           path: web/dist
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./web/package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Install Playwright OS deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
         working-directory: web
       # Visual specs are excluded: baselines must be generated on this runner
       # (font rendering) and none are committed yet — see CLAUDE.md
