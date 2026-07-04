@@ -55,7 +55,6 @@ export const AppConfigSchema = z.object({
   partyMode: z.boolean().default(false),
   theme: z.enum(ThemeNameValues).default('speakeasy'),
   adminUid: z.string(),
-  adminFcmTokens: z.array(z.string()).default([]),
   bartenderUids: z.array(z.string()).default([]),
   bartenderNames: z.record(z.string(), z.string()).default({}),
   barOpen: z.boolean().default(false),
