@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
-import { doc, setDoc, updateDoc, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayRemove } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { getMessagingIfSupported, db } from '../lib/firebase';
 import { useAuth } from './useAuth';
@@ -109,11 +109,17 @@ export function useFcmToken() {
       }
       setToken(fcmToken);
 
-      // Upsert this device; also keep the legacy token array clean
-      const others = devices.filter((d) => d.token !== fcmToken);
+      // Upsert this device against a FRESH read — the hook's subscription
+      // snapshot may not have arrived yet on page load, and writing from a
+      // stale list clobbers every other device's registration
+      const userRef = doc(db, 'users', user.uid);
+      const snap = await getDoc(userRef);
+      const current = ((snap.data()?.fcmDevices as FcmDevice[] | undefined) ?? []).filter(
+        (d) => d.token !== fcmToken,
+      );
       await setDoc(
-        doc(db, 'users', user.uid),
-        { fcmDevices: [...others, { token: fcmToken, label: deviceLabel(), addedAt: Date.now() }] },
+        userRef,
+        { fcmDevices: [...current, { token: fcmToken, label: deviceLabel(), addedAt: Date.now() }] },
         { merge: true },
       );
     } catch (err) {
@@ -163,8 +169,12 @@ export function useFcmToken() {
   const removeDevice = useCallback(
     async (deviceToken: string) => {
       if (!user) return;
-      const remaining = devices.filter((d) => d.token !== deviceToken);
-      await updateDoc(doc(db, 'users', user.uid), {
+      const userRef = doc(db, 'users', user.uid);
+      const snap = await getDoc(userRef);
+      const remaining = ((snap.data()?.fcmDevices as FcmDevice[] | undefined) ?? []).filter(
+        (d) => d.token !== deviceToken,
+      );
+      await updateDoc(userRef, {
         fcmDevices: remaining,
         // Prune legacy array entries too
         fcmTokens: arrayRemove(deviceToken),

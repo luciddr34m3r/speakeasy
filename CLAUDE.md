@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+Never commit directly to `master`. For every change: branch from up-to-date `master` → commit → push → open a PR (`gh pr create`) → wait for ALL CI checks to pass → merge. Merging to `master` triggers `deploy.yml`, which builds with production secrets and deploys hosting + functions + rules automatically — no manual `npm run deploy` needed for merged work (keep it for emergency hotfixes only). PR pushes get a Firebase preview channel deploy with a URL comment. Never commit build/test artifacts (`web/coverage`, `web/playwright-report`, `web/test-results` are gitignored).
+
 ## Commands
 
 All commands are run from the repo root unless noted.
@@ -66,7 +70,7 @@ All users start anonymous. The admin is identified by matching `auth.uid === con
 
 | Function | Trigger | Purpose |
 |---|---|---|
-| `createOrder` | HTTPS Callable | The ONLY way orders are created (client create is denied by rules). Validates bar open + door password (`config/app.barPassword`, normalized case/punct-insensitive) + per-guest throttle (max 3 active, 6 per 10 min), snapshots `partyMode`, persists guest `displayName` |
+| `createOrder` | HTTPS Callable | The ONLY way orders are created (client create is denied by rules). Validates bar open + door password (`config/private.barPassword`, staff-only read; normalized case/punct-insensitive) + per-guest throttle (max 3 active, 6 per 10 min), snapshots `partyMode`, persists guest `displayName` |
 | `onOrderCreate` | Firestore write `orders/*` | Push FCM to all staff (admin + guest bartenders) |
 | `onOrderStatusChange` | Firestore update `orders/*` | Push FCM to guest when status → `ready` (only if `partyMode: true`); staff push on guest cancel |
 | `recommendDrink` | HTTPS Callable | Claude AI recommendation — requires Google auth (not anonymous), 10 req/hour rate limit |
@@ -80,19 +84,22 @@ All users start anonymous. The admin is identified by matching `auth.uid === con
 `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are Firebase Secrets accessed via `{ secrets: [...] }` on callable functions (emulator values in `functions/.secret.local`). The Anthropic model constants (`SONNET`, `HAIKU`) are defined in `functions/src/lib/anthropic.ts`.
 
 ### Ordering access (door password)
-Opening the bar generates `config/app.barPassword` (fun two-word phrase) shown in the admin queue with a QR encoding `/?pw=…`. Guests scan (auto-stored via GuestLayout → localStorage `speakeasy.barPassword`) or type it when prompted on their first order; `createOrder` rejects with `permission-denied` on a wrong/missing password. Closing the bar nulls the password. There is no geolocation anywhere.
+Opening the bar generates a fun two-word password stored in `config/private.barPassword` (staff-only read — NEVER put it on `config/app`, which is publicly readable). It's shown in the admin queue and via the QR icon in the guest nav (staff only), both encoding `/?pw=…`. Guests scan (auto-stored via GuestLayout → localStorage `speakeasy.barPassword`) or type it when prompted on their first order; `createOrder` rejects with `permission-denied` on a wrong/missing password. Admins can regenerate or set a custom password while open. Closing the bar nulls the password. There is no geolocation anywhere.
 
 ### Data model
 Schema source of truth is `web/src/lib/schema.ts` (Zod schemas for `Drink`, `Order`, `UserProfile`, `AppConfig`). Functions do **not** import from `web/` — they declare their own inline types for Firestore data.
 
 Order status flow: `received → viewed → making → ready → delivered`
 
+Staff claiming: the first staff member to advance an order stamps `claimedBy`/`claimedByName` on it; the queue shows "You're on it" / "<name> is on it" so co-bartenders don't double-make drinks.
+
 ### Rate limiting
 `functions/src/lib/rateLimiter.ts`: 10 AI recommendation calls per user per hour. Uses a Firestore transaction on `rateLimits/{uid}` with a per-instance in-memory cache (60s TTL) to reduce Firestore reads.
 
 ### FCM push architecture
-- **Guest + guest-bartender tokens**: stored in `users/{uid}.fcmTokens[]`, registered via the gesture-gated `enableNotifications()` in `useFcmToken` (NotificationPrompt on the order page; Queue for staff)
-- **Admin tokens**: stored in `config/app.adminFcmTokens[]` (only the `adminUid` account writes there)
+- **All tokens (admin included)**: stored on the user's own `users/{uid}.fcmDevices[]` as `{ token, label, addedAt }` (label = "iPhone · Safari" style, parsed from UA). Legacy bare `fcmTokens[]` arrays are still merged at send time (`tokensFromUserData`). Never store tokens on `config/app` — it's publicly readable.
+- Registration is gesture-gated (`enableNotifications()` in `useFcmToken`); with permission already granted it silently re-registers on load unless the device was removed (localStorage `speakeasy.pushDisabled` opt-out). Device upserts/removals MUST read the list via `getDoc` first — writing from the hook's subscription snapshot clobbers other devices' registrations.
+- `NotificationDevices` (on `/me` and the admin queue) lists devices with per-device removal and won't-get-notifications warnings.
 - Pushes are **data-only** (`data: { title, body, ... }`) — a `notification` payload would be auto-displayed by the SDK on top of the SW handler, duplicating notifications
 - **One service worker** (`web/src/sw.ts`, built by vite-plugin-pwa injectManifest into `dist/sw.js`): Workbox precache + SPA navigation route + FCM `onBackgroundMessage` + notificationclick → `/orders/{id}`. Registered at app load by `UpdateToast` (`useRegisterSW`, `registerType: 'prompt'` — new deploys show an update toast)
 - The app is an installable PWA (manifest generated in `vite.config.ts`; apple-touch-icon + iOS metas in index.html; `/sw.js` served with no-cache via firebase.json headers)
