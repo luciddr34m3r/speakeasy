@@ -37,6 +37,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: 'dependabot,dependabot[bot]'
           prompt: |
             You are handling Dependabot PR #${{ github.event.pull_request.number }} in the speakeasy
             repo (see CLAUDE.md for project layout and commands). Your job is to get this dependency
