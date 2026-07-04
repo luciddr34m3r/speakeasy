@@ -90,6 +90,7 @@ export default function ThemeDecorations() {
         <Box
           key={`fw-${i}`}
           component="img"
+          fetchPriority="low"
           decoding="async"
           src={fw.src}
           alt=""
@@ -138,6 +139,7 @@ export default function ThemeDecorations() {
       {/* Old Glory waving in both corners */}
       <Box
         component="img"
+        fetchPriority="low"
         loading="lazy"
         decoding="async"
         src="/july4/flag.webp"
@@ -151,6 +153,7 @@ export default function ThemeDecorations() {
       />
       <Box
         component="img"
+        fetchPriority="low"
         loading="lazy"
         decoding="async"
         src="/july4/flag.webp"
@@ -167,6 +170,7 @@ export default function ThemeDecorations() {
       {fullShow && (
         <Box
           component="img"
+          fetchPriority="low"
           loading="lazy"
           decoding="async"
           src="/july4/eagle.webp"
@@ -214,6 +218,7 @@ export default function ThemeDecorations() {
         />
         <Box
           component="img"
+          fetchPriority="low"
           loading="lazy"
           decoding="async"
           src="/july4/liberty.webp"
@@ -228,6 +233,7 @@ export default function ThemeDecorations() {
       </Box>
       <Box
         component="img"
+        fetchPriority="low"
         loading="lazy"
         decoding="async"
         src="/july4/eagle.webp"
