@@ -16,3 +16,5 @@ storage.rules.lock
 web/playwright-report/
 web/test-results/
 web/e2e/snapshots/
+web/coverage/
+functions/coverage/
