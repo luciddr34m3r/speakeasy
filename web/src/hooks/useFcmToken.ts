@@ -128,10 +128,14 @@ export function useFcmToken() {
   }, [user]);
 
   // Permission already granted (this or a past visit): refresh the token
-  // silently — unless the user removed this device on purpose.
+  // silently — unless the user removed this device on purpose. Deferred a
+  // tick so no setState runs synchronously inside the effect.
   useEffect(() => {
     if (supported && permission === 'granted' && user && !token && !optedOut) {
-      void register();
+      const timer = setTimeout(() => {
+        void register();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [supported, permission, user, token, optedOut, register]);
 
