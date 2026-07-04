@@ -298,6 +298,19 @@ function AdminQueueContent() {
               {updatingBar ? <CircularProgress size={20} sx={{ color: 'inherit' }} /> : config?.barOpen ? 'Close Bar' : 'Open Bar'}
             </Button>
           </Box>
+          {config?.barOpen && !barPassword && (
+            <Alert
+              severity="warning"
+              sx={{ mt: 2 }}
+              action={
+                <Button size="small" onClick={regeneratePassword} sx={{ whiteSpace: 'nowrap' }}>
+                  Generate password
+                </Button>
+              }
+            >
+              The bar is open with no door password — anyone can order. Generate one to lock the door.
+            </Alert>
+          )}
           {config?.barOpen && barPassword && (
             <Box sx={{ mt: 2, display: 'flex', gap: 2.5, alignItems: 'center', flexWrap: 'wrap' }}>
               {qrDataUrl && (

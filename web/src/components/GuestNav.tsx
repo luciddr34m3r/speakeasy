@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import PersonIcon from '@mui/icons-material/Person';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import ShareBarDialog from './ShareBarDialog';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { alpha } from '@mui/material/styles';
@@ -15,6 +19,7 @@ export default function GuestNav() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { config } = useAppConfig();
+  const [shareOpen, setShareOpen] = useState(false);
 
   const isAdmin =
     user && config &&
@@ -37,7 +42,17 @@ export default function GuestNav() {
         >
           The Speakeasy
         </Typography>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+          {isAdmin && config?.barOpen && (
+            <IconButton
+              size="small"
+              aria-label="Share the door password"
+              onClick={() => setShareOpen(true)}
+              sx={{ color: 'primary.main' }}
+            >
+              <QrCode2Icon fontSize="small" />
+            </IconButton>
+          )}
           {isAdmin && (
             <Button
               size="small"
@@ -66,6 +81,7 @@ export default function GuestNav() {
           </Button>
         </Box>
       </Toolbar>
+      <ShareBarDialog open={shareOpen} onClose={() => setShareOpen(false)} />
     </AppBar>
   );
 }
