@@ -62,6 +62,11 @@ jobs:
                finish the job: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
             6. If you cannot make the update safe, do NOT enable auto-merge. Comment on the PR
                with exactly what breaks and why, so a human can decide.
+
+            Note: Bash is allowlisted by command prefix. Prefer simple single commands over
+            compound ones. If a command you need is denied, accomplish it with the allowed
+            tools (npm/npx/node -e) — and if truly blocked, comment on the PR saying so
+            rather than silently stopping.
           claude_args: |
-            --allowedTools "Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(git:*),Bash(gh:*),Bash(firebase:*)"
+            --allowedTools "Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(git:*),Bash(gh:*),Bash(firebase:*),Bash(cd:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*),Bash(sed:*),Bash(awk:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(echo:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(jq:*),Bash(sleep:*),Bash(timeout:*),Bash(true:*),Bash(which:*)"
             --max-turns 100
