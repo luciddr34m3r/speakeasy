@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockSendPush, mockGet } = vi.hoisted(() => ({
+const { mockSendPush, mockSendPushToStaff, mockGet } = vi.hoisted(() => ({
   mockSendPush: vi.fn(),
+  mockSendPushToStaff: vi.fn(),
   mockGet: vi.fn(),
 }));
 
@@ -16,7 +17,14 @@ vi.mock('firebase-admin', () => ({
   initializeApp: vi.fn(),
 }));
 
-vi.mock('../lib/fcm', () => ({ sendPush: mockSendPush }));
+vi.mock('../lib/fcm', () => ({
+  sendPush: mockSendPush,
+  sendPushToStaff: mockSendPushToStaff,
+  tokensFromUserData: (data: Record<string, unknown> | undefined) => [
+    ...(((data?.fcmTokens as string[]) ?? [])),
+    ...((((data?.fcmDevices as Array<{ token: string }>) ?? [])).map((d) => d.token)),
+  ],
+}));
 
 vi.mock('firebase-functions/v2/firestore', () => ({
   onDocumentUpdated: vi.fn((_, handler) => handler),
@@ -28,6 +36,7 @@ interface OrderData {
   status: string;
   partyMode: boolean;
   guestUid: string;
+  guestName: string;
   drinkName: string;
 }
 
@@ -35,12 +44,14 @@ const baseOrder: OrderData = {
   status: 'received',
   partyMode: false,
   guestUid: 'guest-uid',
+  guestName: 'Alice',
   drinkName: 'Negroni',
 };
 
 describe('handleOrderStatusChange', () => {
   beforeEach(() => {
     mockSendPush.mockReset();
+    mockSendPushToStaff.mockReset().mockResolvedValue(undefined);
     mockGet.mockReset();
   });
 
@@ -83,6 +94,7 @@ describe('handleOrderStatusChange', () => {
       '🍹 Your drink is ready!',
       'Come grab your Negroni',
       { orderId: 'order-1', type: 'order_ready' },
+      { docPath: 'users/guest-uid', field: 'fcmTokens' },
     );
   });
 
@@ -93,5 +105,19 @@ describe('handleOrderStatusChange', () => {
       { ...baseOrder, status: 'making', partyMode: true },
     );
     expect(mockSendPush).not.toHaveBeenCalled();
+  });
+
+  it('notifies all staff when a guest cancels', async () => {
+    await handleOrderStatusChange(
+      'order-2',
+      { ...baseOrder, status: 'received' },
+      { ...baseOrder, status: 'cancelled' },
+    );
+
+    expect(mockSendPushToStaff).toHaveBeenCalledWith(
+      'Order cancelled',
+      'Alice cancelled their Negroni',
+      { orderId: 'order-2', type: 'order_cancelled' },
+    );
   });
 });

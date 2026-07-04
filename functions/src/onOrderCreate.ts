@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
-import { sendPush } from './lib/fcm';
+import { sendPushToStaff } from './lib/fcm';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -10,11 +10,7 @@ export async function handleOrderCreate(
 ): Promise<void> {
   if (!order) return;
 
-  const configSnap = await admin.firestore().doc('config/app').get();
-  const adminTokens: string[] = configSnap.data()?.adminFcmTokens ?? [];
-
-  await sendPush(
-    adminTokens,
+  await sendPushToStaff(
     '🍸 New order!',
     `${order.guestName} wants a ${order.drinkName}`,
     { orderId, type: 'new_order' },

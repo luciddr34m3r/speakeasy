@@ -5,6 +5,7 @@ import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import type { Drink } from '../lib/schema';
 
@@ -12,10 +13,9 @@ interface DrinkCardProps {
   drink: Drink;
 }
 
-const PLACEHOLDER_BG = 'linear-gradient(135deg, #1a1008 0%, #2a1a0a 100%)';
-
 export default function DrinkCard({ drink }: DrinkCardProps) {
   const navigate = useNavigate();
+  const { custom } = useTheme();
 
   return (
     <Card
@@ -42,14 +42,14 @@ export default function DrinkCard({ drink }: DrinkCardProps) {
           <Box
             sx={{
               height: 180,
-              background: PLACEHOLDER_BG,
+              background: custom.placeholderGradient,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
             <Typography variant="h2" sx={{ color: 'primary.main', opacity: 0.3, fontSize: '3rem' }}>
-              🍸
+              {custom.placeholderEmoji}
             </Typography>
           </Box>
         )}

@@ -3,7 +3,7 @@ import { getAuth, connectAuthEmulator, onAuthStateChanged, signInAnonymously } f
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
-import { getMessaging } from 'firebase/messaging';
+import { getMessaging, isSupported, type Messaging } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'demo-key',
@@ -20,7 +20,21 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
-export const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
+
+// FCM is not supported in every browser (e.g. iOS Safari outside an installed
+// PWA) — resolve lazily so unsupported environments get null instead of a throw.
+let messagingPromise: Promise<Messaging | null> | null = null;
+export function getMessagingIfSupported(): Promise<Messaging | null> {
+  if (!messagingPromise) {
+    messagingPromise =
+      typeof window === 'undefined'
+        ? Promise.resolve(null)
+        : isSupported()
+            .catch(() => false)
+            .then((ok) => (ok ? getMessaging(app) : null));
+  }
+  return messagingPromise;
+}
 
 if (import.meta.env.DEV) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });

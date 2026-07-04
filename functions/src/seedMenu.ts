@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { assertAdmin } from './lib/adminGuard';
+import { assertStaff } from './lib/adminGuard';
 import { getAnthropicClient, HAIKU } from './lib/anthropic';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -27,7 +27,7 @@ interface DrinkData {
 export const seedMenu = onCall<SeedMenuRequest, Promise<SeedMenuResponse>>(
   { secrets: ['ANTHROPIC_API_KEY'] },
   async (request) => {
-    await assertAdmin(request);
+    await assertStaff(request);
 
     const { drinks } = request.data;
     if (!drinks?.length) throw new HttpsError('invalid-argument', 'Drinks list required.');

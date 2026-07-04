@@ -7,22 +7,34 @@ service cloud.firestore {
              request.auth.uid == get(/databases/$(database)/documents/config/app).data.adminUid;
     }
 
-    // Drinks: available drinks are publicly readable; admin can read/write all
-    match /drinks/{drinkId} {
-      allow read: if resource.data.available == true || isAdmin();
-      allow write: if isAdmin();
+    // Staff = the admin or an invited guest bartender
+    function isStaff() {
+      return request.auth != null &&
+             (request.auth.uid == get(/databases/$(database)/documents/config/app).data.adminUid ||
+              request.auth.uid in get(/databases/$(database)/documents/config/app).data.get('bartenderUids', []));
     }
 
-    // Orders: any authenticated user (anon included) can create their own order;
+    // Drinks: available drinks are publicly readable; staff can read/write all
+    match /drinks/{drinkId} {
+      allow read: if resource.data.available == true || isStaff();
+      allow write: if isStaff();
+    }
+
+    // Orders: created only by the createOrder Cloud Function (Admin SDK bypasses
+    //         these rules) — no client-side creation;
     //         read is restricted to the order owner or admin;
-    //         status updates are admin-only
+    //         updates are admin-only, except the owner may cancel while 'received'
     match /orders/{orderId} {
-      allow create: if request.auth != null &&
-                       request.resource.data.guestUid == request.auth.uid;
       allow read: if request.auth != null &&
-                     (resource.data.guestUid == request.auth.uid || isAdmin());
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+                     (resource.data.guestUid == request.auth.uid || isStaff());
+      allow update: if isStaff() ||
+                       (request.auth != null &&
+                        resource.data.guestUid == request.auth.uid &&
+                        resource.data.status == 'received' &&
+                        request.resource.data.status == 'cancelled' &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['status', 'cancelledAt']));
+      allow delete: if isStaff();
     }
 
     // User profiles: users can only read/write their own profile
@@ -30,11 +42,22 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // App config: anyone authenticated can read (for partyMode, adminUid check);
-    //             only admin can write
+    // App config: publicly readable — the theme and bar status must render
+    //             before anonymous sign-in completes (fresh/incognito visits).
+    //             Nothing secret lives here (secrets go in config/private).
+    //             Admin can write anything, guest bartenders only the
+    //             bar-operations fields (never the staff/token lists).
     match /config/app {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow write: if isAdmin();
+      allow update: if isStaff() &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['partyMode', 'barOpen', 'barOpenedAt', 'theme']);
+    }
+
+    // Staff secrets — the door password lives here so guests can't read it
+    match /config/private {
+      allow read, write: if isStaff();
     }
   }
 }

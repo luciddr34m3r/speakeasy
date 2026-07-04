@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -6,36 +7,54 @@ import Stepper from '@mui/material/Stepper';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { db } from '../lib/firebase';
+import NotificationPrompt from '../components/NotificationPrompt';
+import ConfirmDialog from '../components/ConfirmDialog';
 import type { Order, OrderStatus as OrderStatusType } from '../lib/schema';
 
-const PARTY_STEPS: { status: OrderStatusType; label: string; desc: string }[] = [
+const STEPS: { status: OrderStatusType; label: string; desc: string }[] = [
   { status: 'received', label: 'Received', desc: "We've got your order." },
   { status: 'viewed', label: 'Seen', desc: 'The bartender has seen it.' },
   { status: 'making', label: 'Making', desc: "We're crafting your drink." },
   { status: 'ready', label: 'Ready!', desc: 'Come pick it up!' },
 ];
 
-const SIMPLE_STEPS: { status: OrderStatusType; label: string; desc: string }[] = [
-  { status: 'received', label: 'Received', desc: "We've got your order." },
-  { status: 'viewed', label: 'Seen', desc: 'The bartender has seen it. Hang tight!' },
-];
-
-function getActiveStep(status: OrderStatusType, partyMode: boolean): number {
-  const steps = partyMode ? PARTY_STEPS : SIMPLE_STEPS;
-  const idx = steps.findIndex((s) => s.status === status);
-  return idx === -1 ? steps.length - 1 : idx;
+function getActiveStep(status: OrderStatusType): number {
+  const idx = STEPS.findIndex((s) => s.status === status);
+  return idx === -1 ? STEPS.length - 1 : idx;
 }
 
 export default function OrderStatus() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const [orderData, loading] = useDocumentData(doc(db, 'orders', id ?? '_'));
   const order = orderData as Omit<Order, 'id'> | undefined;
+
+  const handleCancel = async () => {
+    if (!id) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await updateDoc(doc(db, 'orders', id), {
+        status: 'cancelled',
+        cancelledAt: serverTimestamp(),
+      });
+    } catch {
+      // Rules reject the cancel once the order has left 'received'
+      setCancelError('Too late — the bartender is already on it.');
+    } finally {
+      setCancelling(false);
+      setConfirmCancelOpen(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -53,11 +72,12 @@ export default function OrderStatus() {
     );
   }
 
-  const steps = order.partyMode ? PARTY_STEPS : SIMPLE_STEPS;
-  const activeStep = getActiveStep(order.status, order.partyMode);
+  const steps = STEPS;
+  const activeStep = getActiveStep(order.status);
   const currentStep = steps[activeStep];
   const isReady = order.status === 'ready';
   const isDelivered = order.status === 'delivered';
+  const isCancelled = order.status === 'cancelled';
 
   return (
     <Container maxWidth="sm" sx={{ py: 6, textAlign: 'center' }}>
@@ -68,7 +88,13 @@ export default function OrderStatus() {
         for {order.guestName}
       </Typography>
 
-      {isDelivered ? (
+      {isCancelled ? (
+        <Box>
+          <Typography variant="h2" sx={{ mb: 2 }}>🚫</Typography>
+          <Typography variant="h5" sx={{ mb: 1 }}>Order cancelled</Typography>
+          <Typography color="text.secondary">No worries — the menu awaits.</Typography>
+        </Box>
+      ) : isDelivered ? (
         <Box>
           <Typography variant="h2" sx={{ mb: 2 }}>🥂</Typography>
           <Typography variant="h5" sx={{ mb: 1 }}>Enjoy!</Typography>
@@ -113,13 +139,43 @@ export default function OrderStatus() {
         </>
       )}
 
-      <Button
-        variant="text"
-        onClick={() => navigate('/')}
-        sx={{ mt: 5, color: 'text.secondary', fontSize: '0.75rem' }}
-      >
-        Back to menu
-      </Button>
+      {order.partyMode && !isDelivered && !isCancelled && !isReady && <NotificationPrompt />}
+
+      {cancelError && (
+        <Alert severity="info" sx={{ mt: 3, textAlign: 'left' }} onClose={() => setCancelError(null)}>
+          {cancelError}
+        </Alert>
+      )}
+
+      <Box sx={{ mt: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+        {order.status === 'received' && (
+          <Button
+            variant="text"
+            onClick={() => setConfirmCancelOpen(true)}
+            disabled={cancelling}
+            sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+          >
+            {cancelling ? <CircularProgress size={14} sx={{ color: 'inherit' }} /> : 'Cancel order'}
+          </Button>
+        )}
+        <Button
+          variant="text"
+          onClick={() => navigate('/')}
+          sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+        >
+          Back to menu
+        </Button>
+      </Box>
+
+      <ConfirmDialog
+        open={confirmCancelOpen}
+        title="Cancel this order?"
+        message={`The ${order.drinkName} won't be made.`}
+        confirmLabel="Cancel order"
+        busy={cancelling}
+        onConfirm={handleCancel}
+        onClose={() => setConfirmCancelOpen(false)}
+      />
     </Container>
   );
 }

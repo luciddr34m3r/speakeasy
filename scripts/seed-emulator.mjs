@@ -12,11 +12,25 @@
  *   WARNING: writes directly to the live database.
  */
 import { createRequire } from 'module';
+import { existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 const admin = require('../functions/node_modules/firebase-admin');
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.argv.includes('--prod');
+
+// Emulator seeds get local photos from web/public/drink-images (committed to the
+// repo); prod photos live in Firebase Storage via generate-drink-images.mjs.
+const slugify = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+function localPhotoPath(name) {
+  if (isProd) return null;
+  const slug = slugify(name);
+  const file = resolve(__dirname, '../web/public/drink-images', `${slug}.jpg`);
+  return existsSync(file) ? `/drink-images/${slug}.jpg` : null;
+}
 
 if (isProd) {
   console.log('🚀 Targeting PRODUCTION (the-speakeasy-e3533)\n');
@@ -39,6 +53,8 @@ await db.doc('config/app').set({
   partyMode: false,
   adminUid: 'YOUR_ADMIN_UID',
   adminFcmTokens: [],
+  barOpen: false,
+  geofenceRadiusM: 150,
 });
 console.log('✓ config/app set');
 
@@ -170,6 +186,7 @@ for (const drink of drinks) {
   const ref = db.collection('drinks').doc();
   await ref.set({
     ...drink,
+    photoPath: drink.photoPath ?? localPhotoPath(drink.name),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });

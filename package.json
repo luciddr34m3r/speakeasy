@@ -7,7 +7,7 @@
     "build:functions": "npm run build --prefix functions",
     "emulate": "firebase emulators:start --project demo-speakeasy",
     "emulate:import": "firebase emulators:start --project demo-speakeasy --import .emulator-data --export-on-exit",
-    "deploy": "npm run build && node scripts/inject-sw-config.mjs && npm run build:functions && firebase deploy",
+    "deploy": "npm run build && npm run build:functions && firebase deploy",
     "seed:prod": "node scripts/seed-emulator.mjs --prod",
     "generate:images": "node --env-file=.env scripts/generate-drink-images.mjs"
   },
