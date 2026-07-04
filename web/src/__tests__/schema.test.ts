@@ -55,7 +55,12 @@ describe('OrderSchema', () => {
   });
 
   it('throws on invalid status', () => {
-    expect(() => OrderSchema.parse({ ...base, status: 'cancelled' })).toThrow();
+    expect(() => OrderSchema.parse({ ...base, status: 'exploded' })).toThrow();
+  });
+
+  it('accepts optional distanceM', () => {
+    const result = OrderSchema.parse({ ...base, distanceM: 42 });
+    expect(result.distanceM).toBe(42);
   });
 });
 
@@ -95,11 +100,19 @@ describe('AppConfigSchema', () => {
     const result = AppConfigSchema.parse({ adminUid: 'uid-admin' });
     expect(result.partyMode).toBe(false);
     expect(result.adminFcmTokens).toEqual([]);
+    expect(result.barOpen).toBe(false);
+    expect(result.theme).toBe('speakeasy');
   });
+
+  it('accepts known themes and rejects unknown ones', () => {
+    expect(AppConfigSchema.parse({ adminUid: 'x', theme: 'july4' }).theme).toBe('july4');
+    expect(() => AppConfigSchema.parse({ adminUid: 'x', theme: 'xmas' })).toThrow();
+  });
+
 });
 
 describe('OrderStatusValues', () => {
   it('contains exactly the expected statuses in order', () => {
-    expect(OrderStatusValues).toEqual(['received', 'viewed', 'making', 'ready', 'delivered']);
+    expect(OrderStatusValues).toEqual(['received', 'viewed', 'making', 'ready', 'delivered', 'cancelled']);
   });
 });

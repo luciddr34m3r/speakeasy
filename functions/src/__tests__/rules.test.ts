@@ -13,6 +13,7 @@ let testEnv: RulesTestEnvironment;
 const ADMIN_UID = 'admin-uid-123';
 const GUEST_UID = 'guest-uid-456';
 const OTHER_UID = 'other-uid-789';
+const BARTENDER_UID = 'bartender-uid-321';
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
@@ -20,14 +21,14 @@ beforeAll(async () => {
     firestore: {
       host: '127.0.0.1',
       port: 8080,
-      rules: readFileSync(resolve(__dirname, '../../../../firestore.rules'), 'utf8'),
+      rules: readFileSync(resolve(__dirname, '../../../firestore.rules'), 'utf8'),
     },
   });
 
   // Seed config/app with adminUid
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await db.doc('config/app').set({ adminUid: ADMIN_UID, partyMode: false, adminFcmTokens: [] });
+    await db.doc('config/app').set({ adminUid: ADMIN_UID, partyMode: false, adminFcmTokens: [], bartenderUids: [BARTENDER_UID], bartenderNames: {} });
   });
 });
 
@@ -40,7 +41,7 @@ beforeEach(async () => {
   // Re-seed config/app after each clear
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await db.doc('config/app').set({ adminUid: ADMIN_UID, partyMode: false, adminFcmTokens: [] });
+    await db.doc('config/app').set({ adminUid: ADMIN_UID, partyMode: false, adminFcmTokens: [], bartenderUids: [BARTENDER_UID], bartenderNames: {} });
   });
 });
 
@@ -60,6 +61,10 @@ function adminContext() {
 
 function otherContext() {
   return testEnv.authenticatedContext(OTHER_UID);
+}
+
+function bartenderContext() {
+  return testEnv.authenticatedContext(BARTENDER_UID);
 }
 
 // ─── Drinks ───────────────────────────────────────────────────────────────────
@@ -126,28 +131,14 @@ describe('orders collection', () => {
     });
   });
 
-  it('allows authenticated user to create their own order', async () => {
+  it('denies authenticated user from creating an order client-side (createOrder callable only)', async () => {
     const db = guestContext().firestore();
-    await assertSucceeds(
+    await assertFails(
       db.doc('orders/new-order').set({
         drinkId: 'drink-1',
         drinkName: 'Negroni',
         guestUid: GUEST_UID,
         guestName: 'Alice',
-        status: 'received',
-        partyMode: false,
-      }),
-    );
-  });
-
-  it('denies authenticated user from creating order with different guestUid', async () => {
-    const db = guestContext().firestore();
-    await assertFails(
-      db.doc('orders/spoofed-order').set({
-        drinkId: 'drink-1',
-        drinkName: 'Negroni',
-        guestUid: ADMIN_UID, // spoofing admin UID
-        guestName: 'Hacker',
         status: 'received',
         partyMode: false,
       }),
@@ -192,6 +183,48 @@ describe('orders collection', () => {
     const db = adminContext().firestore();
     await assertSucceeds(db.doc('orders/guest-order').update({ status: 'viewed' }));
   });
+
+  it('allows owner to cancel their own received order', async () => {
+    const db = guestContext().firestore();
+    await assertSucceeds(
+      db.doc('orders/guest-order').update({ status: 'cancelled', cancelledAt: new Date() }),
+    );
+  });
+
+  it('denies owner from cancelling once the order has been viewed', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('orders/guest-order').update({ status: 'viewed' });
+    });
+    const db = guestContext().firestore();
+    await assertFails(
+      db.doc('orders/guest-order').update({ status: 'cancelled', cancelledAt: new Date() }),
+    );
+  });
+
+  it('denies owner from moving status to anything other than cancelled', async () => {
+    const db = guestContext().firestore();
+    await assertFails(
+      db.doc('orders/guest-order').update({ status: 'delivered', cancelledAt: new Date() }),
+    );
+  });
+
+  it('denies owner cancel that also mutates other fields', async () => {
+    const db = guestContext().firestore();
+    await assertFails(
+      db.doc('orders/guest-order').update({
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        drinkName: 'Something Else',
+      }),
+    );
+  });
+
+  it('denies non-owner from cancelling someone else\'s order', async () => {
+    const db = otherContext().firestore();
+    await assertFails(
+      db.doc('orders/guest-order').update({ status: 'cancelled', cancelledAt: new Date() }),
+    );
+  });
 });
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -233,9 +266,20 @@ describe('config/app document', () => {
     await assertSucceeds(db.doc('config/app').get());
   });
 
-  it('denies unauthenticated user from reading config/app', async () => {
+  it('allows unauthenticated reads of config/app (theme must render pre-auth)', async () => {
     const db = anonContext().firestore();
-    await assertFails(db.doc('config/app').get());
+    await assertSucceeds(db.doc('config/app').get());
+  });
+
+  it('keeps config/private staff-only', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('config/private').set({ barPassword: 'VELVET EAGLE' });
+    });
+    await assertFails(guestContext().firestore().doc('config/private').get());
+    await assertFails(anonContext().firestore().doc('config/private').get());
+    await assertSucceeds(bartenderContext().firestore().doc('config/private').get());
+    await assertSucceeds(adminContext().firestore().doc('config/private').get());
+    await assertSucceeds(bartenderContext().firestore().doc('config/private').set({ barPassword: 'NEW ONE' }));
   });
 
   it('denies non-admin from writing config/app', async () => {
@@ -246,5 +290,57 @@ describe('config/app document', () => {
   it('allows admin to write config/app', async () => {
     const db = adminContext().firestore();
     await assertSucceeds(db.doc('config/app').update({ partyMode: true }));
+  });
+});
+
+// ─── Guest bartenders (staff) ────────────────────────────────────────────────
+
+describe('guest bartender permissions', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc('orders/guest-order').set({
+        drinkId: 'drink-1',
+        drinkName: 'Negroni',
+        guestUid: GUEST_UID,
+        guestName: 'Alice',
+        status: 'received',
+        partyMode: false,
+      });
+      await db.doc('drinks/available-drink').set({ name: 'Negroni', available: true, category: 'Cocktails', ingredients: [] });
+    });
+  });
+
+  it('allows a bartender to advance order status', async () => {
+    const db = bartenderContext().firestore();
+    await assertSucceeds(db.doc('orders/guest-order').update({ status: 'viewed' }));
+  });
+
+  it('allows a bartender to read any order', async () => {
+    const db = bartenderContext().firestore();
+    await assertSucceeds(db.doc('orders/guest-order').get());
+  });
+
+  it('allows a bartender to write drinks', async () => {
+    const db = bartenderContext().firestore();
+    await assertSucceeds(db.doc('drinks/available-drink').update({ available: false }));
+  });
+
+  it('allows a bartender to update bar-operations config fields', async () => {
+    const db = bartenderContext().firestore();
+    await assertSucceeds(db.doc('config/app').update({ partyMode: true, barOpen: true }));
+  });
+
+  it('denies a bartender from touching the staff or token lists', async () => {
+    const db = bartenderContext().firestore();
+    await assertFails(db.doc('config/app').update({ bartenderUids: [] }));
+    await assertFails(db.doc('config/app').update({ adminUid: BARTENDER_UID }));
+    await assertFails(db.doc('config/app').update({ adminFcmTokens: ['stolen'] }));
+  });
+
+  it('still denies a random signed-in user from staff actions', async () => {
+    const db = otherContext().firestore();
+    await assertFails(db.doc('orders/guest-order').update({ status: 'viewed' }));
+    await assertFails(db.doc('config/app').update({ barOpen: true }));
   });
 });

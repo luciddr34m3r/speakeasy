@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
 import DrinkCard from '../../components/DrinkCard';
+import { getAppTheme } from '../../themes';
 import type { Drink } from '../../lib/schema';
 
 vi.mock('../../lib/firebase', () => ({
@@ -30,9 +32,11 @@ const baseDrink: Drink = {
 
 function renderCard(drink: Drink = baseDrink) {
   return render(
-    <MemoryRouter>
-      <DrinkCard drink={drink} />
-    </MemoryRouter>,
+    <ThemeProvider theme={getAppTheme('speakeasy')}>
+      <MemoryRouter>
+        <DrinkCard drink={drink} />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 

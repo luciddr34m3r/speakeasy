@@ -21,7 +21,7 @@ vi.mock('firebase-functions/v2/https', () => ({
   },
 }));
 
-vi.mock('../lib/adminGuard', () => ({ assertAdmin: mockAssertAdmin }));
+vi.mock('../lib/adminGuard', () => ({ assertAdmin: mockAssertAdmin, assertStaff: mockAssertAdmin }));
 
 vi.mock('../lib/anthropic', () => ({
   getAnthropicClient: () => ({ messages: { create: mockCreate } }),

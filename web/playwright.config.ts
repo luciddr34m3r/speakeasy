@@ -17,6 +17,7 @@ export default defineConfig({
     baseURL: BASE_URL,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
+    serviceWorkers: 'block',
   },
   expect: {
     toHaveScreenshot: {

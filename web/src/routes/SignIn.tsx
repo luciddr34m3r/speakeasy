@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
-import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, signInWithCredential, getRedirectResult } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import { alpha } from '@mui/material/styles';
+import { GoogleAuthProvider, signInWithPopup, linkWithPopup, signInWithCredential } from 'firebase/auth';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 
@@ -14,40 +15,43 @@ const provider = new GoogleAuthProvider();
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Only allow in-app destinations for post-sign-in redirects
+  const rawNext = searchParams.get('next');
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
 
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (!result) return;
-        navigate('/');
-      })
-      .catch(async (err) => {
-        if (err.code === 'auth/credential-already-in-use' || err.code === 'auth/email-already-in-use') {
-          const credential = GoogleAuthProvider.credentialFromError(err);
-          if (credential) {
-            await signInWithCredential(auth, credential);
-            navigate('/');
-          }
-        } else if (err.code !== 'auth/cancelled-popup-request') {
-          setError(err.message ?? 'Sign-in failed.');
-        }
-      });
-  }, [navigate]);
-
+  // Popup (not redirect) sign-in: redirect flows lose their pending state under
+  // modern browser storage partitioning, and the app's anonymous auto-sign-in
+  // races the redirect resume on reload. Popups avoid both.
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
     try {
       if (user?.isAnonymous) {
-        await linkWithRedirect(user, provider);
+        // Upgrade the anonymous account in place so existing orders keep their uid
+        await linkWithPopup(user, provider);
       } else {
-        await signInWithRedirect(auth, provider);
+        await signInWithPopup(auth, provider);
       }
+      navigate(next);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed.');
+      const code = (err as { code?: string }).code;
+      if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use') {
+        // This Google account already has its own user — sign into it instead of linking
+        const credential = GoogleAuthProvider.credentialFromError(err as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]);
+        if (credential) {
+          await signInWithCredential(auth, credential);
+          navigate(next);
+          return;
+        }
+        setError('This Google account is already in use.');
+      } else if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setError(err instanceof Error ? err.message : 'Sign-in failed.');
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -70,12 +74,12 @@ export default function SignIn() {
         size="large"
         onClick={handleGoogleSignIn}
         disabled={loading}
-        sx={{
+        sx={(t) => ({
           borderColor: 'primary.main',
           color: 'primary.main',
           py: 1.5,
-          '&:hover': { borderColor: 'primary.light', bgcolor: 'rgba(201,169,110,0.05)' },
-        }}
+          '&:hover': { borderColor: 'primary.light', bgcolor: alpha(t.palette.primary.main, 0.05) },
+        })}
         startIcon={
           loading ? (
             <CircularProgress size={18} sx={{ color: 'primary.main' }} />

@@ -1,7 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { DocumentData, DocumentSnapshot, FirestoreError } from 'firebase/firestore';
+
+const { mockUpdateDoc, mockEnableNotifications, mockUseFcmToken } = vi.hoisted(() => ({
+  mockUpdateDoc: vi.fn(),
+  mockEnableNotifications: vi.fn(),
+  mockUseFcmToken: vi.fn(),
+}));
 
 vi.mock('../../lib/firebase', () => ({
   auth: {},
@@ -13,10 +20,16 @@ vi.mock('../../lib/firebase', () => ({
 
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
+  updateDoc: mockUpdateDoc,
+  serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
 }));
 
 vi.mock('react-firebase-hooks/firestore', () => ({
   useDocumentData: vi.fn(),
+}));
+
+vi.mock('../../hooks/useFcmToken', () => ({
+  useFcmToken: mockUseFcmToken,
 }));
 
 import { useDocumentData } from 'react-firebase-hooks/firestore';
@@ -49,6 +62,14 @@ type UseDocumentDataReturn = [DocumentData | undefined, boolean, FirestoreError 
 describe('OrderStatus', () => {
   beforeEach(() => {
     mockUseDocumentData.mockReset();
+    mockUpdateDoc.mockReset().mockResolvedValue(undefined);
+    mockUseFcmToken.mockReset().mockReturnValue({
+      supported: true,
+      permission: 'default',
+      permissionDenied: false,
+      token: null,
+      enableNotifications: mockEnableNotifications,
+    });
   });
 
   it('shows spinner while loading', () => {
@@ -70,20 +91,8 @@ describe('OrderStatus', () => {
     expect(screen.getByText(/for Alice/i)).toBeInTheDocument();
   });
 
-  it('shows 2-step stepper in simple mode (partyMode false)', () => {
+  it('shows the full 4-step stepper regardless of party mode', () => {
     mockUseDocumentData.mockReturnValue([{ ...baseOrder, partyMode: false }, false, undefined, undefined] as UseDocumentDataReturn);
-    renderOrderStatus();
-    expect(screen.getByText('Received')).toBeInTheDocument();
-    expect(screen.getByText('Seen')).toBeInTheDocument();
-    expect(screen.queryByText('Making')).not.toBeInTheDocument();
-    expect(screen.queryByText('Ready!')).not.toBeInTheDocument();
-  });
-
-  it('shows 4-step stepper in party mode', () => {
-    mockUseDocumentData.mockReturnValue([
-      { ...baseOrder, partyMode: true, status: 'making' },
-      false, undefined, undefined,
-    ] as UseDocumentDataReturn);
     renderOrderStatus();
     expect(screen.getByText('Received')).toBeInTheDocument();
     expect(screen.getByText('Seen')).toBeInTheDocument();
@@ -108,5 +117,92 @@ describe('OrderStatus', () => {
     renderOrderStatus();
     expect(screen.getByText(/Enjoy!/i)).toBeInTheDocument();
     expect(screen.getByText(/Cheers/i)).toBeInTheDocument();
+  });
+
+  it('shows a cancel button only while the order is received', () => {
+    mockUseDocumentData.mockReturnValue([baseOrder, false, undefined, undefined] as UseDocumentDataReturn);
+    renderOrderStatus();
+    expect(screen.getByRole('button', { name: /cancel order/i })).toBeInTheDocument();
+  });
+
+  it('hides the cancel button once the order has been seen', () => {
+    mockUseDocumentData.mockReturnValue([
+      { ...baseOrder, status: 'viewed' },
+      false, undefined, undefined,
+    ] as UseDocumentDataReturn);
+    renderOrderStatus();
+    expect(screen.queryByRole('button', { name: /cancel order/i })).not.toBeInTheDocument();
+  });
+
+  it('cancels the order after confirming in the dialog', async () => {
+    mockUseDocumentData.mockReturnValue([baseOrder, false, undefined, undefined] as UseDocumentDataReturn);
+    const user = userEvent.setup();
+    renderOrderStatus();
+
+    await user.click(screen.getByRole('button', { name: /cancel order/i }));
+    expect(screen.getByText(/cancel this order\?/i)).toBeInTheDocument();
+    expect(mockUpdateDoc).not.toHaveBeenCalled();
+
+    const dialogButtons = screen.getAllByRole('button', { name: /cancel order/i });
+    await user.click(dialogButtons[dialogButtons.length - 1]);
+    expect(mockUpdateDoc).toHaveBeenCalledWith(undefined, {
+      status: 'cancelled',
+      cancelledAt: 'SERVER_TIMESTAMP',
+    });
+  });
+
+  it('shows a too-late message when the cancel is rejected', async () => {
+    mockUseDocumentData.mockReturnValue([baseOrder, false, undefined, undefined] as UseDocumentDataReturn);
+    mockUpdateDoc.mockRejectedValue(new Error('permission-denied'));
+    const user = userEvent.setup();
+    renderOrderStatus();
+
+    await user.click(screen.getByRole('button', { name: /cancel order/i }));
+    const dialogButtons = screen.getAllByRole('button', { name: /cancel order/i });
+    await user.click(dialogButtons[dialogButtons.length - 1]);
+    expect(await screen.findByText(/too late/i)).toBeInTheDocument();
+  });
+
+  it('offers the notification prompt for in-progress party-mode orders', () => {
+    mockUseDocumentData.mockReturnValue([
+      { ...baseOrder, partyMode: true, status: 'making' },
+      false, undefined, undefined,
+    ] as UseDocumentDataReturn);
+    renderOrderStatus();
+    expect(screen.getByText(/want a ping/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /enable/i })).toBeInTheDocument();
+  });
+
+  it('hides the notification prompt outside party mode', () => {
+    mockUseDocumentData.mockReturnValue([baseOrder, false, undefined, undefined] as UseDocumentDataReturn);
+    renderOrderStatus();
+    expect(screen.queryByText(/want a ping/i)).not.toBeInTheDocument();
+  });
+
+  it('hides the notification prompt when permission is already granted', () => {
+    mockUseFcmToken.mockReturnValue({
+      supported: true,
+      permission: 'granted',
+      permissionDenied: false,
+      token: 'tok',
+      enableNotifications: mockEnableNotifications,
+    });
+    mockUseDocumentData.mockReturnValue([
+      { ...baseOrder, partyMode: true },
+      false, undefined, undefined,
+    ] as UseDocumentDataReturn);
+    renderOrderStatus();
+    expect(screen.queryByText(/want a ping/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the cancelled screen for a cancelled order', () => {
+    mockUseDocumentData.mockReturnValue([
+      { ...baseOrder, status: 'cancelled' },
+      false, undefined, undefined,
+    ] as UseDocumentDataReturn);
+    renderOrderStatus();
+    expect(screen.getByText(/order cancelled/i)).toBeInTheDocument();
+    expect(screen.getByText(/the menu awaits/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /cancel order/i })).not.toBeInTheDocument();
   });
 });

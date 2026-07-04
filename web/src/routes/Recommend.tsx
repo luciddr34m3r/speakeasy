@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -12,12 +12,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MicIcon from '@mui/icons-material/Mic';
 import StopIcon from '@mui/icons-material/Stop';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import { alpha } from '@mui/material/styles';
 import { useNavigate, Link } from 'react-router-dom';
 import { doc } from 'firebase/firestore';
 import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
+import { useSpeechInput } from '../hooks/useSpeechInput';
 import type { Drink } from '../lib/schema';
 
 interface Recommendation {
@@ -26,31 +28,15 @@ interface Recommendation {
   reason: string;
 }
 
-interface ISpeechRecognition {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-type SpeechRecognitionCtor = new () => ISpeechRecognition;
-const SpeechRecognitionImpl: SpeechRecognitionCtor | undefined =
-  (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition ??
-  (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition;
-
 export default function Recommend() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [transcript, setTranscript] = useState('');
-  const [listening, setListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rec, setRec] = useState<Recommendation | null>(null);
-  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const { supported, listening, startListening, stopListening } = useSpeechInput(setTranscript);
 
   const [recDrinkData] = useDocumentData(rec ? doc(db, 'drinks', rec.drinkId) : null);
   const recDrink = recDrinkData as Omit<Drink, 'id'> | undefined;
@@ -58,35 +44,6 @@ export default function Recommend() {
   // Load guest's ratings if signed in
   const [userProfileData] = useDocumentData(user && !user.isAnonymous ? doc(db, 'users', user.uid) : null);
   const ratings = (userProfileData as { ratings?: Record<string, number> } | undefined)?.ratings ?? {};
-
-  const startListening = useCallback(() => {
-    if (!SpeechRecognitionImpl) {
-      setError('Voice input is not supported in this browser. Please type instead.');
-      return;
-    }
-    const recognition = new SpeechRecognitionImpl();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const current = Array.from(event.results)
-        .map((r) => r[0].transcript)
-        .join('');
-      setTranscript(current);
-    };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => { setListening(false); };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
-  }, []);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setListening(false);
-  }, []);
 
   const handleGetRecommendation = async () => {
     if (!transcript.trim()) {
@@ -104,7 +61,13 @@ export default function Recommend() {
       const result = await fn({ transcript, ratings });
       setRec(result.data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not get a recommendation right now.');
+      // Never surface raw SDK/model errors to guests
+      const code = (err as { code?: string }).code;
+      setError(
+        code === 'functions/resource-exhausted'
+          ? "You've hit the hourly limit — give it a little while."
+          : "The bartender's AI is taking a break — try again in a moment.",
+      );
     } finally {
       setLoading(false);
     }
@@ -120,8 +83,11 @@ export default function Recommend() {
           </IconButton>
           <Typography variant="h4">AI Recommendations</Typography>
         </Box>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Sign in with Google to unlock personalized drink recommendations.
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          Describe what you&apos;re in the mood for and the bartender&apos;s AI will pick your drink.
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Sign in so recommendations can learn your taste — your thumbs-up history feeds the AI.
         </Typography>
         <Button
           variant="outlined"
@@ -159,7 +125,7 @@ export default function Recommend() {
           onChange={(e) => setTranscript(e.target.value)}
           placeholder="e.g. something smoky and strong, not too sweet…"
         />
-        {SpeechRecognitionImpl && (
+        {supported && (
           <IconButton
             onClick={listening ? stopListening : startListening}
             sx={{
@@ -198,13 +164,13 @@ export default function Recommend() {
       {/* Recommendation result */}
       {rec && recDrink && (
         <Box
-          sx={{
+          sx={(t) => ({
             p: 3,
             border: '1px solid',
             borderColor: 'primary.main',
             borderRadius: 1,
-            background: 'rgba(201,169,110,0.06)',
-          }}
+            background: alpha(t.palette.primary.main, 0.06),
+          })}
         >
           <Typography variant="overline" sx={{ color: 'primary.main', letterSpacing: '0.2em', fontSize: '0.6rem' }}>
             Tonight, I suggest

@@ -58,11 +58,23 @@ describe('AdminGuard', () => {
     expect(screen.queryByText('Sign in with Google')).not.toBeInTheDocument();
   });
 
+  it('offers a back-to-menu link on the staff-only screen', () => {
+    const anonUser = { uid: 'anon-uid', isAnonymous: true } as User;
+    mockUseAuth.mockReturnValue({ user: anonUser, loading: false, error: undefined });
+    mockUseAppConfig.mockReturnValue({
+      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [], barOpen: false, geofenceRadiusM: 150, theme: 'speakeasy', bartenderUids: [], bartenderNames: {} } as AppConfig,
+      loading: false,
+      error: undefined,
+    });
+    renderGuard();
+    expect(screen.getByRole('button', { name: /back to menu/i })).toBeInTheDocument();
+  });
+
   it('shows sign-in prompt for anonymous user', () => {
     const anonUser = { uid: 'anon-uid', isAnonymous: true } as User;
     mockUseAuth.mockReturnValue({ user: anonUser, loading: false, error: undefined });
     mockUseAppConfig.mockReturnValue({
-      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [] } as AppConfig,
+      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [], barOpen: false, geofenceRadiusM: 150, theme: 'speakeasy', bartenderUids: [], bartenderNames: {} } as AppConfig,
       loading: false,
       error: undefined,
     });
@@ -75,7 +87,7 @@ describe('AdminGuard', () => {
     const adminUser = { uid: 'admin-uid', isAnonymous: false } as User;
     mockUseAuth.mockReturnValue({ user: adminUser, loading: false, error: undefined });
     mockUseAppConfig.mockReturnValue({
-      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [] } as AppConfig,
+      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [], barOpen: false, geofenceRadiusM: 150, theme: 'speakeasy', bartenderUids: [], bartenderNames: {} } as AppConfig,
       loading: false,
       error: undefined,
     });
@@ -87,7 +99,7 @@ describe('AdminGuard', () => {
     const otherUser = { uid: 'other-uid', isAnonymous: false, email: 'other@test.com' } as User;
     mockUseAuth.mockReturnValue({ user: otherUser, loading: false, error: undefined });
     mockUseAppConfig.mockReturnValue({
-      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [] } as AppConfig,
+      config: { adminUid: 'admin-uid', partyMode: false, adminFcmTokens: [], barOpen: false, geofenceRadiusM: 150, theme: 'speakeasy', bartenderUids: [], bartenderNames: {} } as AppConfig,
       loading: false,
       error: undefined,
     });

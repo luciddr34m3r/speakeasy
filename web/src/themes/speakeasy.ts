@@ -6,7 +6,15 @@ import '@fontsource/cormorant/400.css';
 import '@fontsource/cormorant/400-italic.css';
 import '@fontsource/cormorant/600.css';
 
-const theme = createTheme({
+const speakeasy = createTheme({
+  custom: {
+    name: 'speakeasy',
+    metaThemeColor: '#0a0a0a',
+    navBg: '#0d0d0d',
+    placeholderGradient: 'linear-gradient(135deg, #1a1008 0%, #2a1a0a 100%)',
+    placeholderEmoji: '🍸',
+    decorations: false,
+  },
   palette: {
     mode: 'dark',
     background: {
@@ -83,4 +91,4 @@ const theme = createTheme({
   },
 });
 
-export default theme;
+export default speakeasy;

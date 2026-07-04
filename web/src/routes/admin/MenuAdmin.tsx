@@ -14,12 +14,17 @@ import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useDrinks } from '../../hooks/useDrinks';
+import { deleteDrink } from '../../lib/drinkAdmin';
 import AdminGuard from '../../components/AdminGuard';
 import AdminNav from '../../components/AdminNav';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import type { Drink } from '../../lib/schema';
 
 export default function MenuAdmin() {
   return (
@@ -32,12 +37,25 @@ export default function MenuAdmin() {
 function MenuAdminContent() {
   const navigate = useNavigate();
   const { drinks, loading } = useDrinks(true);
+  const [deleteTarget, setDeleteTarget] = useState<Drink | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const toggleAvailable = async (drinkId: string, current: boolean) => {
     await updateDoc(doc(db, 'drinks', drinkId), {
       available: !current,
       updatedAt: serverTimestamp(),
     });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDrink(deleteTarget);
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -68,7 +86,7 @@ function MenuAdminContent() {
                   <TableCell>Category</TableCell>
                   <TableCell>Ingredients</TableCell>
                   <TableCell align="center">Available</TableCell>
-                  <TableCell align="right">Edit</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -96,8 +114,11 @@ function MenuAdminContent() {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={() => navigate(`/admin/menu/${drink.id}`)}>
+                      <IconButton size="small" aria-label={`Edit ${drink.name}`} onClick={() => navigate(`/admin/menu/${drink.id}`)}>
                         <EditIcon fontSize="small" sx={{ color: 'primary.main' }} />
+                      </IconButton>
+                      <IconButton size="small" aria-label={`Delete ${drink.name}`} onClick={() => setDeleteTarget(drink)}>
+                        <DeleteOutlineIcon fontSize="small" sx={{ color: 'error.main' }} />
                       </IconButton>
                     </TableCell>
                   </TableRow>
@@ -113,6 +134,15 @@ function MenuAdminContent() {
             </Table>
           </Paper>
         )}
+
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title={`Delete "${deleteTarget?.name}"?`}
+          message="This removes the drink and its photo permanently."
+          busy={deleting}
+          onConfirm={handleDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
       </Container>
     </>
   );

@@ -18,4 +18,13 @@ console.log('✓ icon-512.png');
 await sharp(svg).resize(72, 72).greyscale().png().toFile(`${outDir}/badge-72.png`);
 console.log('✓ badge-72.png');
 
+// iOS home-screen icon: opaque (iOS renders transparency as black) and at
+// the app root where Safari looks for it.
+await sharp(svg)
+  .resize(180, 180)
+  .flatten({ background: '#0a0a0a' })
+  .png()
+  .toFile(resolve(__dirname, '../web/public/apple-touch-icon.png'));
+console.log('✓ apple-touch-icon.png');
+
 console.log('Done!');

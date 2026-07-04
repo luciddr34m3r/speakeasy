@@ -18,7 +18,7 @@ node scripts/seed-emulator.mjs  # Seed emulator with sample drinks + app config 
 ```bash
 npm run build                # Build web (tsc + vite)
 npm run build:functions      # Build functions (tsc → lib/)
-npm run deploy               # Full deploy: build web + inject SW config + build functions + firebase deploy
+npm run deploy               # Full deploy: build web + build functions + firebase deploy
 ```
 
 **Tests**
@@ -66,13 +66,21 @@ All users start anonymous. The admin is identified by matching `auth.uid === con
 
 | Function | Trigger | Purpose |
 |---|---|---|
-| `onOrderCreate` | Firestore write `orders/*` | Push FCM to admin devices |
-| `onOrderStatusChange` | Firestore update `orders/*` | Push FCM to guest when status → `ready` (only if `partyMode: true`) |
+| `createOrder` | HTTPS Callable | The ONLY way orders are created (client create is denied by rules). Validates bar open + door password (`config/app.barPassword`, normalized case/punct-insensitive) + per-guest throttle (max 3 active, 6 per 10 min), snapshots `partyMode`, persists guest `displayName` |
+| `onOrderCreate` | Firestore write `orders/*` | Push FCM to all staff (admin + guest bartenders) |
+| `onOrderStatusChange` | Firestore update `orders/*` | Push FCM to guest when status → `ready` (only if `partyMode: true`); staff push on guest cancel |
 | `recommendDrink` | HTTPS Callable | Claude AI recommendation — requires Google auth (not anonymous), 10 req/hour rate limit |
-| `generateDrinkDescription` | HTTPS Callable | Claude AI drink description generation |
-| `seedMenu` | HTTPS Callable | Seed drinks from admin UI |
+| `generateDrinkRecipe` | HTTPS Callable | Claude (Sonnet) invents a full recipe from a free-text/spoken request (staff only) |
+| `generateDrinkImage` | HTTPS Callable | gpt-image-1 drink photo; accepts an optional full `prompt` override (staff only, `OPENAI_API_KEY` secret) |
+| `generateDrinkDescription` | HTTPS Callable | Claude AI drink description generation (staff only) |
+| `seedMenu` | HTTPS Callable | Seed drinks from admin UI (staff only) |
+| `createBartenderInvite` / `claimBartenderInvite` | HTTPS Callable | Guest bartender invite codes (see Staff section) |
+| `sendTestPush` | HTTPS Callable | Staff self-test of the full push pipeline |
 
-`ANTHROPIC_API_KEY` is a Firebase Secret accessed via `{ secrets: ['ANTHROPIC_API_KEY'] }` on callable functions. The Anthropic model constants (`SONNET`, `HAIKU`) are defined in `functions/src/lib/anthropic.ts`.
+`ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are Firebase Secrets accessed via `{ secrets: [...] }` on callable functions (emulator values in `functions/.secret.local`). The Anthropic model constants (`SONNET`, `HAIKU`) are defined in `functions/src/lib/anthropic.ts`.
+
+### Ordering access (door password)
+Opening the bar generates `config/app.barPassword` (fun two-word phrase) shown in the admin queue with a QR encoding `/?pw=…`. Guests scan (auto-stored via GuestLayout → localStorage `speakeasy.barPassword`) or type it when prompted on their first order; `createOrder` rejects with `permission-denied` on a wrong/missing password. Closing the bar nulls the password. There is no geolocation anywhere.
 
 ### Data model
 Schema source of truth is `web/src/lib/schema.ts` (Zod schemas for `Drink`, `Order`, `UserProfile`, `AppConfig`). Functions do **not** import from `web/` — they declare their own inline types for Firestore data.
@@ -83,9 +91,14 @@ Order status flow: `received → viewed → making → ready → delivered`
 `functions/src/lib/rateLimiter.ts`: 10 AI recommendation calls per user per hour. Uses a Firestore transaction on `rateLimits/{uid}` with a per-instance in-memory cache (60s TTL) to reduce Firestore reads.
 
 ### FCM push architecture
-- **Guest tokens**: stored in `users/{uid}.fcmTokens[]`, registered by `GuestFcmRegistrar` component on app load
-- **Admin tokens**: stored in `config/app.adminFcmTokens[]`, registered in `AdminNav`
-- Service worker config (`VITE_FIREBASE_*` vars) is injected into `web/dist/firebase-messaging-sw.js` at deploy time by `scripts/inject-sw-config.mjs`
+- **Guest + guest-bartender tokens**: stored in `users/{uid}.fcmTokens[]`, registered via the gesture-gated `enableNotifications()` in `useFcmToken` (NotificationPrompt on the order page; Queue for staff)
+- **Admin tokens**: stored in `config/app.adminFcmTokens[]` (only the `adminUid` account writes there)
+- Pushes are **data-only** (`data: { title, body, ... }`) — a `notification` payload would be auto-displayed by the SDK on top of the SW handler, duplicating notifications
+- **One service worker** (`web/src/sw.ts`, built by vite-plugin-pwa injectManifest into `dist/sw.js`): Workbox precache + SPA navigation route + FCM `onBackgroundMessage` + notificationclick → `/orders/{id}`. Registered at app load by `UpdateToast` (`useRegisterSW`, `registerType: 'prompt'` — new deploys show an update toast)
+- The app is an installable PWA (manifest generated in `vite.config.ts`; apple-touch-icon + iOS metas in index.html; `/sw.js` served with no-cache via firebase.json headers)
+
+### Staff / guest bartenders
+`config/app.bartenderUids[]` (+ `bartenderNames{}`) grants temporary staff access: admin UI (`AdminGuard`/rules/`assertStaff` all check admin-or-bartender), bar-ops config writes (not the staff/token lists), and order pushes via `sendPushToStaff`. Invite flow: admin's Staff card → `createBartenderInvite` callable → 6-char single-use code (24h) → invitee signs in with Google at `/bartender` → `claimBartenderInvite`. Closing the bar clears the bartender list.
 
 ### Local development notes
 The web app auto-connects to emulators when `import.meta.env.DEV` is true. The emulator project ID is `demo-speakeasy`. Firestore rules tests (`test:rules`) require the Firestore emulator to already be running on port 8080.

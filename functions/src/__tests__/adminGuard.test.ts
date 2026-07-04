@@ -11,7 +11,7 @@ vi.mock('firebase-admin', () => ({
   initializeApp: vi.fn(),
 }));
 
-import { assertAdmin } from '../lib/adminGuard';
+import { assertAdmin, assertStaff } from '../lib/adminGuard';
 
 function makeRequest(uid: string | null): CallableRequest {
   return {
@@ -22,10 +22,10 @@ function makeRequest(uid: string | null): CallableRequest {
   };
 }
 
-function mockAdminDoc(adminUid: string | undefined) {
+function mockAdminDoc(adminUid: string | undefined, bartenderUids?: string[]) {
   const docRef = {
     get: vi.fn().mockResolvedValue({
-      data: () => (adminUid ? { adminUid } : undefined),
+      data: () => (adminUid ? { adminUid, ...(bartenderUids ? { bartenderUids } : {}) } : undefined),
     }),
   };
   mockDoc.mockReturnValue(docRef);
@@ -75,5 +75,40 @@ describe('assertAdmin', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(HttpsError);
     }
+  });
+});
+
+describe('assertStaff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDoc.mockReset();
+  });
+
+  it('throws unauthenticated when request.auth is null', async () => {
+    await expect(assertStaff(makeRequest(null))).rejects.toMatchObject({ code: 'unauthenticated' });
+  });
+
+  it('resolves for the admin', async () => {
+    mockAdminDoc('admin-uid', []);
+    await expect(assertStaff(makeRequest('admin-uid'))).resolves.toBeUndefined();
+  });
+
+  it('resolves for an invited bartender', async () => {
+    mockAdminDoc('admin-uid', ['bartender-uid']);
+    await expect(assertStaff(makeRequest('bartender-uid'))).resolves.toBeUndefined();
+  });
+
+  it('rejects everyone else', async () => {
+    mockAdminDoc('admin-uid', ['bartender-uid']);
+    await expect(assertStaff(makeRequest('random-uid'))).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+  });
+
+  it('rejects when bartenderUids is absent and uid is not admin', async () => {
+    mockAdminDoc('admin-uid');
+    await expect(assertStaff(makeRequest('bartender-uid'))).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
   });
 });

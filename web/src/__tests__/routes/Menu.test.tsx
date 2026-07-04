@@ -19,6 +19,14 @@ vi.mock('../../hooks/useDrinks', () => ({
   useDrinks: vi.fn(),
 }));
 
+vi.mock('../../hooks/useAppConfig', () => ({
+  useAppConfig: vi.fn(),
+}));
+
+vi.mock('../../hooks/useActiveOrder', () => ({
+  useActiveOrder: vi.fn(),
+}));
+
 vi.mock('../../components/GuestNav', () => ({
   default: () => <nav data-testid="guest-nav" />,
 }));
@@ -27,18 +35,26 @@ vi.mock('../../components/DrinkCard', () => ({
   default: ({ drink }: { drink: Drink }) => <div data-testid="drink-card">{drink.name}</div>,
 }));
 
+import { ThemeProvider } from '@mui/material/styles';
 import { useAuth } from '../../hooks/useAuth';
 import { useDrinks } from '../../hooks/useDrinks';
+import { useAppConfig } from '../../hooks/useAppConfig';
+import { useActiveOrder } from '../../hooks/useActiveOrder';
+import { getAppTheme } from '../../themes';
 import Menu from '../../routes/Menu';
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUseDrinks = vi.mocked(useDrinks);
+const mockUseAppConfig = vi.mocked(useAppConfig);
+const mockUseActiveOrder = vi.mocked(useActiveOrder);
 
 function renderMenu() {
   return render(
-    <MemoryRouter>
-      <Menu />
-    </MemoryRouter>,
+    <ThemeProvider theme={getAppTheme('speakeasy')}>
+      <MemoryRouter>
+        <Menu />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
@@ -51,6 +67,12 @@ const sampleDrinks: Drink[] = [
 describe('Menu', () => {
   beforeEach(() => {
     mockUseAuth.mockReturnValue({ user: null, loading: false, error: undefined });
+    mockUseAppConfig.mockReturnValue({
+      config: { barOpen: true, adminUid: 'admin' },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useAppConfig>);
+    mockUseActiveOrder.mockReturnValue({ activeOrder: null, loading: false });
   });
 
   it('shows skeleton grid while loading', () => {
@@ -60,10 +82,38 @@ describe('Menu', () => {
     expect(screen.queryByText(/closed/i)).not.toBeInTheDocument();
   });
 
-  it('shows "bar is closed" when no drinks and not loading', () => {
+  it('shows "menu is empty" when no drinks and not loading', () => {
     mockUseDrinks.mockReturnValue({ drinks: [], loading: false, error: undefined });
     renderMenu();
-    expect(screen.getByText(/bar is closed/i)).toBeInTheDocument();
+    expect(screen.getByText(/menu is empty/i)).toBeInTheDocument();
+  });
+
+  it('shows an active-order chip that links to the order', () => {
+    mockUseDrinks.mockReturnValue({ drinks: sampleDrinks, loading: false, error: undefined });
+    mockUseActiveOrder.mockReturnValue({
+      activeOrder: {
+        id: 'order-1', drinkId: 'd', drinkName: 'Old Fashioned', guestUid: 'u', guestName: 'A',
+        status: 'received', partyMode: false,
+      },
+      loading: false,
+    });
+    renderMenu();
+    expect(screen.getByText(/old fashioned — received/i)).toBeInTheDocument();
+  });
+
+  it('orders categories with Classics first, not alphabetically', () => {
+    mockUseDrinks.mockReturnValue({
+      drinks: [
+        { id: '1', name: 'A-Drink', category: 'After Dinner', ingredients: [], available: true, description: '' },
+        { id: '2', name: 'B-Drink', category: 'Classics', ingredients: [], available: true, description: '' },
+        { id: '3', name: 'C-Drink', category: 'Modern Classics', ingredients: [], available: true, description: '' },
+      ],
+      loading: false,
+      error: undefined,
+    });
+    renderMenu();
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent);
+    expect(tabs).toEqual(['Classics', 'Modern Classics', 'After Dinner']);
   });
 
   it('renders drink cards when drinks are available', () => {
@@ -86,5 +136,28 @@ describe('Menu', () => {
     mockUseDrinks.mockReturnValue({ drinks: oneCat, loading: false, error: undefined });
     renderMenu();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+
+  it('shows the closed banner when the bar is closed', () => {
+    mockUseAppConfig.mockReturnValue({
+      config: { barOpen: false, adminUid: 'admin' },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useAppConfig>);
+    mockUseDrinks.mockReturnValue({ drinks: sampleDrinks, loading: false, error: undefined });
+    renderMenu();
+    expect(screen.getByText(/currently closed/i)).toBeInTheDocument();
+    expect(screen.getAllByTestId('drink-card')).toHaveLength(3);
+  });
+
+  it('hides the closed banner while config is loading', () => {
+    mockUseAppConfig.mockReturnValue({
+      config: undefined,
+      loading: true,
+      error: undefined,
+    } as ReturnType<typeof useAppConfig>);
+    mockUseDrinks.mockReturnValue({ drinks: sampleDrinks, loading: false, error: undefined });
+    renderMenu();
+    expect(screen.queryByText(/currently closed/i)).not.toBeInTheDocument();
   });
 });

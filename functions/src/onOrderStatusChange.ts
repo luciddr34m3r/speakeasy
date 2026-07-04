@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import { sendPush } from './lib/fcm';
+import { sendPush, sendPushToStaff, tokensFromUserData } from './lib/fcm';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -8,6 +8,7 @@ interface OrderData {
   status: string;
   partyMode: boolean;
   guestUid: string;
+  guestName: string;
   drinkName: string;
 }
 
@@ -22,13 +23,23 @@ export async function handleOrderStatusChange(
   // Only notify guest when ready, and only when partyMode was on for this order
   if (after.status === 'ready' && after.partyMode === true) {
     const userSnap = await admin.firestore().doc(`users/${after.guestUid}`).get();
-    const guestTokens: string[] = userSnap.data()?.fcmTokens ?? [];
+    const guestTokens = tokensFromUserData(userSnap.data());
 
     await sendPush(
       guestTokens,
       '🍹 Your drink is ready!',
       `Come grab your ${after.drinkName}`,
       { orderId, type: 'order_ready' },
+      { docPath: `users/${after.guestUid}`, field: 'fcmTokens' },
+    );
+  }
+
+  // Tell the bartenders when a guest cancels so nobody makes a ghost drink
+  if (after.status === 'cancelled') {
+    await sendPushToStaff(
+      'Order cancelled',
+      `${after.guestName} cancelled their ${after.drinkName}`,
+      { orderId, type: 'order_cancelled' },
     );
   }
 }

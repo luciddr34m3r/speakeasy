@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { assertAdmin } from './lib/adminGuard';
+import { assertStaff } from './lib/adminGuard';
 import { getAnthropicClient, HAIKU } from './lib/anthropic';
 
 if (!admin.apps.length) admin.initializeApp();
@@ -18,7 +18,7 @@ interface GenDescResponse {
 export const generateDrinkDescription = onCall<GenDescRequest, Promise<GenDescResponse>>(
   { secrets: ['ANTHROPIC_API_KEY'] },
   async (request) => {
-    await assertAdmin(request);
+    await assertStaff(request);
 
     const { name, ingredients, category = 'Cocktail' } = request.data;
     if (!name || ingredients.length === 0) {

@@ -13,7 +13,7 @@ export const DrinkSchema = z.object({
 });
 export type Drink = z.infer<typeof DrinkSchema> & { id: string };
 
-export const OrderStatusValues = ['received', 'viewed', 'making', 'ready', 'delivered'] as const;
+export const OrderStatusValues = ['received', 'viewed', 'making', 'ready', 'delivered', 'cancelled'] as const;
 export type OrderStatus = typeof OrderStatusValues[number];
 
 export const OrderSchema = z.object({
@@ -23,10 +23,16 @@ export const OrderSchema = z.object({
   guestName: z.string(),
   status: z.enum(OrderStatusValues).default('received'),
   partyMode: z.boolean().default(false),
+  distanceM: z.number().optional(),
+  note: z.string().max(120).optional(),
+  claimedBy: z.string().optional(),
+  claimedByName: z.string().optional(),
   createdAt: z.instanceof(Timestamp).optional(),
   viewedAt: z.instanceof(Timestamp).optional(),
+  makingAt: z.instanceof(Timestamp).optional(),
   readyAt: z.instanceof(Timestamp).optional(),
   deliveredAt: z.instanceof(Timestamp).optional(),
+  cancelledAt: z.instanceof(Timestamp).optional(),
 });
 export type Order = z.infer<typeof OrderSchema> & { id: string };
 
@@ -35,13 +41,24 @@ export const UserProfileSchema = z.object({
   isGoogleLinked: z.boolean().default(false),
   ratings: z.record(z.string(), z.union([z.literal(1), z.literal(-1)])).default({}),
   lastOrderAt: z.instanceof(Timestamp).optional(),
-  fcmTokens: z.array(z.string()).default([]),
+  fcmTokens: z.array(z.string()).default([]), // legacy — new registrations use fcmDevices
+  fcmDevices: z
+    .array(z.object({ token: z.string(), label: z.string(), addedAt: z.number() }))
+    .default([]),
 });
 export type UserProfile = z.infer<typeof UserProfileSchema> & { id: string };
 
+export const ThemeNameValues = ['speakeasy', 'july4'] as const;
+export type ThemeName = typeof ThemeNameValues[number];
+
 export const AppConfigSchema = z.object({
   partyMode: z.boolean().default(false),
+  theme: z.enum(ThemeNameValues).default('speakeasy'),
   adminUid: z.string(),
   adminFcmTokens: z.array(z.string()).default([]),
+  bartenderUids: z.array(z.string()).default([]),
+  bartenderNames: z.record(z.string(), z.string()).default({}),
+  barOpen: z.boolean().default(false),
+  barOpenedAt: z.instanceof(Timestamp).optional(),
 });
 export type AppConfig = z.infer<typeof AppConfigSchema>;

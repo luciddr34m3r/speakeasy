@@ -32,7 +32,7 @@ vi.mock('../lib/anthropic', () => ({
   SONNET: 'claude-sonnet-test',
 }));
 
-vi.mock('../lib/rateLimiter', () => ({ assertRateLimit: mockRateLimit }));
+vi.mock('../lib/rateLimiter', () => ({ assertRateLimit: mockRateLimit, assertGlobalDailyBudget: vi.fn().mockResolvedValue(undefined) }));
 
 import { recommendDrinkHandler } from '../recommendDrink';
 import type { CallableRequest } from 'firebase-functions/v2/https';
@@ -107,6 +107,30 @@ describe('recommendDrinkHandler', () => {
     expect(result.drinkId).toBe('drink-1');
     expect(result.drinkName).toBe('Negroni');
     expect(result.reason).toBe('Bold and bitter.');
+  });
+
+  it('strips markdown fences before parsing (Sonnet loves fences)', async () => {
+    mockGet.mockResolvedValue({ empty: false, docs: sampleDrinks });
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '```json\n{"drinkId":"drink-1","drinkName":"Negroni","reason":"Bold."}\n```' }],
+    });
+    const result = await recommendDrinkHandler(makeRequest());
+    expect(result.drinkId).toBe('drink-1');
+  });
+
+  it('rejects transcripts over 300 characters', async () => {
+    await expect(
+      recommendDrinkHandler(makeRequest({ data: { transcript: 'x'.repeat(301), ratings: {} } })),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('caps the returned reason length', async () => {
+    mockGet.mockResolvedValue({ empty: false, docs: sampleDrinks });
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify({ drinkId: 'drink-1', drinkName: 'Negroni', reason: 'y'.repeat(1000) }) }],
+    });
+    const result = await recommendDrinkHandler(makeRequest());
+    expect(result.reason.length).toBeLessThanOrEqual(240);
   });
 
   it('throws internal when AI returns malformed JSON', async () => {
