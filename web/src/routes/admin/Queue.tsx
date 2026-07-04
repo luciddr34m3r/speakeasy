@@ -94,10 +94,9 @@ function AdminQueueContent() {
   // QR encodes the menu URL with the password baked in — guests scan and
   // ordering just works
   useEffect(() => {
-    if (!barPassword || !config?.barOpen) {
-      setQrDataUrl(null);
-      return;
-    }
+    // No sync setState here (lint); a stale QR is harmless — rendering is
+    // gated on barOpen && barPassword
+    if (!barPassword || !config?.barOpen) return;
     const url = `${window.location.origin}/?pw=${encodeURIComponent(barPassword)}`;
     QRCode.toDataURL(url, { width: 240, margin: 1 })
       .then(setQrDataUrl)

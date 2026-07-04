@@ -19,10 +19,8 @@ export default function ShareBarDialog({ open, onClose }: { open: boolean; onClo
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!barPassword) {
-      setQrDataUrl(null);
-      return;
-    }
+    // No sync setState here (lint); rendering is gated on barPassword
+    if (!barPassword) return;
     const url = `${window.location.origin}/?pw=${encodeURIComponent(barPassword)}`;
     QRCode.toDataURL(url, { width: 480, margin: 1 })
       .then(setQrDataUrl)

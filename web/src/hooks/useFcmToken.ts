@@ -88,9 +88,9 @@ export function useFcmToken() {
   const register = useCallback(async (): Promise<void> => {
     if (registering.current) return;
     registering.current = true;
-    setError(null);
     try {
       const messaging = await getMessagingIfSupported();
+      setError(null);
       if (!messaging || !user || !VAPID_KEY) return;
 
       const sw = await Promise.race([
