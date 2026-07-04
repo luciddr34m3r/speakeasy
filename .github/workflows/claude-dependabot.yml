@@ -1,0 +1,65 @@
+name: Claude Dependabot Handler
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  claude:
+    name: Verify, fix and auto-merge dependency bump
+    # Only dependabot-initiated events; Claude's own fix pushes won't re-trigger this
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # NOTE: dependabot-triggered runs read Dependabot secrets, not Actions secrets.
+      # ANTHROPIC_API_KEY must also exist under Settings → Secrets → Dependabot.
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are handling Dependabot PR #${{ github.event.pull_request.number }} in the speakeasy
+            repo (see CLAUDE.md for project layout and commands). Your job is to get this dependency
+            update merged safely, fixing our code if the new versions require it.
+
+            1. Install dependencies: npm ci at the repo root, in web/, and in functions/.
+            2. Run the full local gate: lint (npm run lint --prefix web), typecheck web
+               (npx tsc -b in web/), typecheck functions (npx tsc --noEmit in functions/),
+               unit tests (npm run test --prefix web and --prefix functions), and build
+               (npm run build --prefix web, npm run build:functions).
+            3. Verify the app still functions and looks right: install Playwright browsers if
+               needed (npx playwright install chromium --with-deps, from web/), run the e2e
+               suite (npm run test:e2e --prefix web), then use Playwright directly to take
+               full-page screenshots of the app (desktop 1280px and mobile 390px) and inspect
+               them for visual breakage: missing styles, broken layout, blank pages, overlapping
+               elements. Note: use waitUntil 'load' plus a settle delay, never 'networkidle' —
+               the app holds live Firestore connections.
+            4. If anything fails because of the version bumps, fix OUR code to work with the new
+               versions — prefer adapting the code over downgrading or re-pinning dependencies.
+               Commit and push fixes to this PR branch.
+            5. Only when every gate above passes locally, enable auto-merge so required CI checks
+               finish the job: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+            6. If you cannot make the update safe, do NOT enable auto-merge. Comment on the PR
+               with exactly what breaks and why, so a human can decide.
+          claude_args: |
+            --allowedTools "Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(git:*),Bash(gh:*),Bash(firebase:*)"
+            --max-turns 100

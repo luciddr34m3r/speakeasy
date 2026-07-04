@@ -1,23 +1,39 @@
-name: Claude Code Issue Handler
+name: Claude Issue Handler
 
 on:
   issues:
-    types: [labeled]
+    types: [assigned, labeled]
   issue_comment:
     types: [created]
 
 jobs:
   claude:
-    name: Handle with Claude Code
+    name: Implement with Claude Code
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'claude')) ||
+      (github.event_name == 'issues') ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
     permissions:
       contents: write
       pull-requests: write
       issues: write
+      actions: read
     steps:
-      - uses: anthropic/claude-code-action@v1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          assignee_trigger: 'claude'
+          label_trigger: 'claude'
+          branch_prefix: 'claude/'
+          track_progress: true
+          claude_args: |
+            --allowedTools "Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(git:*),Bash(gh:*)"
+            --append-system-prompt "You are implementing a GitHub issue for the speakeasy repo. Follow CLAUDE.md conventions. Before opening a PR: run lint (npm run lint --prefix web), typecheck (npx tsc -b in web/, npx tsc --noEmit in functions/), and unit tests (npm run test --prefix web, npm run test --prefix functions). Open the PR against master. End your PR description by noting that the 'Preview Deploy' check posts a Firebase preview channel link on the PR for manual testing, and that a human reviews and merges — never merge yourself."
