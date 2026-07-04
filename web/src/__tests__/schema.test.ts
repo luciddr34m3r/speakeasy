@@ -99,7 +99,6 @@ describe('AppConfigSchema', () => {
   it('parses with defaults', () => {
     const result = AppConfigSchema.parse({ adminUid: 'uid-admin' });
     expect(result.partyMode).toBe(false);
-    expect(result.adminFcmTokens).toEqual([]);
     expect(result.barOpen).toBe(false);
     expect(result.theme).toBe('speakeasy');
   });

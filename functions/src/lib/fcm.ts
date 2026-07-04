@@ -64,8 +64,7 @@ export function tokensFromUserData(data: FirebaseFirestore.DocumentData | undefi
 
 /**
  * Push to everyone behind the bar. All staff tokens (admin included) live on
- * their own users/{uid} docs; legacy config/app.adminFcmTokens is still
- * drained during the transition.
+ * their own users/{uid} docs.
  */
 export async function sendPushToStaff(
   title: string,
@@ -84,11 +83,5 @@ export async function sendPushToStaff(
     const userSnap = await db.doc(`users/${uid}`).get();
     const tokens = tokensFromUserData(userSnap.data());
     await sendPush(tokens, title, body, data, { docPath: `users/${uid}`, field: 'fcmTokens' });
-  }
-
-  // Legacy admin tokens registered before device management existed
-  const legacyAdminTokens: string[] = (config.adminFcmTokens as string[] | undefined) ?? [];
-  if (legacyAdminTokens.length > 0) {
-    await sendPush(legacyAdminTokens, title, body, data, { docPath: 'config/app', field: 'adminFcmTokens' });
   }
 }
