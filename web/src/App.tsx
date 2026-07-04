@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import GuestNav from './components/GuestNav';
 import { storeBarPassword } from './lib/barPassword';
 import { getAppTheme } from './themes';
@@ -10,14 +10,25 @@ import UpdateToast from './components/UpdateToast';
 import Menu from './routes/Menu';
 import DrinkDetail from './routes/DrinkDetail';
 import OrderStatus from './routes/OrderStatus';
-import Recommend from './routes/Recommend';
-import History from './routes/History';
-import SignIn from './routes/SignIn';
-import BartenderClaim from './routes/BartenderClaim';
-import AdminQueue from './routes/admin/Queue';
-import MenuAdmin from './routes/admin/MenuAdmin';
-import DrinkEdit from './routes/admin/DrinkEdit';
-import SeedMenu from './routes/admin/SeedMenu';
+
+// Everything off the core guest ordering path loads on demand — guests
+// shouldn't pay for the admin surface (or the AI studio) to see the menu
+const Recommend = lazy(() => import('./routes/Recommend'));
+const History = lazy(() => import('./routes/History'));
+const SignIn = lazy(() => import('./routes/SignIn'));
+const BartenderClaim = lazy(() => import('./routes/BartenderClaim'));
+const AdminQueue = lazy(() => import('./routes/admin/Queue'));
+const MenuAdmin = lazy(() => import('./routes/admin/MenuAdmin'));
+const DrinkEdit = lazy(() => import('./routes/admin/DrinkEdit'));
+const SeedMenu = lazy(() => import('./routes/admin/SeedMenu'));
+
+function RouteFallback() {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
+      <CircularProgress color="primary" />
+    </Box>
+  );
+}
 
 // Every guest page keeps the app bar; admin pages have AdminNav instead
 function GuestLayout() {
@@ -59,6 +70,7 @@ export default function App() {
       <UpdateToast />
       <BrowserRouter>
         <ThemeDecorations />
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route element={<GuestLayout />}>
             <Route path="/" element={<Menu />} />
@@ -75,6 +87,7 @@ export default function App() {
           <Route path="/admin/seed" element={<SeedMenu />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </ThemeProvider>
   );
