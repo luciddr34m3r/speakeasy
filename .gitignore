@@ -13,3 +13,6 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 storage.rules.lock
+web/playwright-report/
+web/test-results/
+web/e2e/snapshots/
