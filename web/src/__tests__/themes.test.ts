@@ -13,6 +13,18 @@ describe('w00w00 theme', () => {
   });
 });
 
+describe('beach theme', () => {
+  it('uses the harbor palette: navy background, seafoam primary, brass secondary', () => {
+    const t = getAppTheme('beach');
+    expect(t.custom.name).toBe('beach');
+    expect(t.palette.background.default).toBe('#0b1c2c');
+    expect(t.palette.primary.main).toBe('#8fd3c7');
+    expect(t.palette.secondary.main).toBe('#c8a45c');
+    expect(t.typography.h1.fontFamily).toContain('Cormorant');
+    expect(t.custom.decorations).toBe(true);
+  });
+});
+
 describe('getAppTheme', () => {
   it('returns the speakeasy theme by name', () => {
     const theme = getAppTheme('speakeasy');

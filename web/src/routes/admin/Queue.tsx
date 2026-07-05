@@ -418,6 +418,7 @@ function AdminQueueContent() {
               <ToggleButton value="speakeasy">🥃 Speakeasy</ToggleButton>
               <ToggleButton value="july4">🇺🇸 July 4th</ToggleButton>
               <ToggleButton value="w00w00">👀 w00w00</ToggleButton>
+              <ToggleButton value="beach">⛵ Beach</ToggleButton>
             </ToggleButtonGroup>
           )}
         </Box>

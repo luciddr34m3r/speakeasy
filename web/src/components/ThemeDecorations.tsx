@@ -67,6 +67,7 @@ export default function ThemeDecorations() {
   if (!theme.custom.decorations || pathname.startsWith('/admin')) return null;
 
   if (theme.custom.name === 'w00w00') return <W00w00Decorations menuPage={pathname === '/'} />;
+  if (theme.custom.name === 'beach') return <BeachDecorations menuPage={pathname === '/'} />;
 
   // The menu shows content in opaque cards, so it can take the full show.
   // Text-on-background pages (order status, history, forms) only get the
@@ -338,6 +339,120 @@ function W00w00Decorations({ menuPage }: { menuPage: boolean }) {
           [w00w00]
         </Box>
       )}
+    </Box>
+  );
+}
+
+const drift = keyframes`
+  from { transform: translateX(-80px) rotate(-1deg); }
+  50%  { transform: translateX(45vw) rotate(1.5deg); }
+  to   { transform: translateX(100vw) rotate(-1deg); }
+`;
+
+const bob = keyframes`
+  from { transform: translateY(0); }
+  to   { transform: translateY(-5px); }
+`;
+
+const SHELLS = [
+  { char: '🐚', left: '8%', bottom: 34, size: '1.1rem', opacity: 0.35 },
+  { char: '⭐', left: '86%', bottom: 52, size: '0.8rem', opacity: 0.25 },
+  { char: '🐚', left: '68%', bottom: 26, size: '0.9rem', opacity: 0.28 },
+];
+
+/**
+ * Elegant nautical layer: a sailboat drifting across the horizon, a
+ * layered wave rule under the header, shells along the tideline, and a
+ * brass anchor. Yacht club, not tiki bar.
+ */
+function BeachDecorations({ menuPage }: { menuPage: boolean }) {
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: -1,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Horizon wave rule below the nav */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 88,
+          left: 0,
+          right: 0,
+          textAlign: 'center',
+          color: 'rgba(143,211,199,0.3)',
+          fontSize: '0.85rem',
+          letterSpacing: '0.35em',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+        }}
+      >
+        {'≈ '.repeat(80)}
+      </Box>
+      {/* Sailboat on a slow crossing (menu page only) */}
+      {menuPage && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 64,
+            left: 0,
+            fontSize: '1.6rem',
+            opacity: 0.75,
+            animation: `${drift} 75s linear infinite`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none', left: 'auto', right: 24 },
+          }}
+        >
+          ⛵
+        </Box>
+      )}
+      {/* Tideline shells */}
+      {SHELLS.map((shell, i) => (
+        <Box
+          key={`shell-${i}`}
+          component="span"
+          sx={{
+            position: 'absolute',
+            left: shell.left,
+            bottom: shell.bottom,
+            fontSize: shell.size,
+            opacity: shell.opacity,
+            animation: `${bob} 3.4s ease-in-out infinite alternate`,
+            animationDelay: `${i * 0.9}s`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}
+        >
+          {shell.char}
+        </Box>
+      ))}
+      {/* Brass anchor holding the bottom corner */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 18,
+          right: 16,
+          fontSize: '2rem',
+          opacity: 0.3,
+          filter: 'sepia(0.6) saturate(1.4)',
+        }}
+      >
+        ⚓
+      </Box>
+      {/* Tideline: a soft sea-glass glow along the very bottom */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 90,
+          background: 'linear-gradient(0deg, rgba(143,211,199,0.10) 0%, transparent 100%)',
+        }}
+      />
     </Box>
   );
 }
