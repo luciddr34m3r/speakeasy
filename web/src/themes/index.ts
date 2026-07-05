@@ -2,6 +2,7 @@ import type { Theme } from '@mui/material/styles';
 import type { ThemeName } from '../lib/schema';
 import speakeasy from './speakeasy';
 import july4 from './july4';
+import w00w00 from './w00w00';
 
 export interface CustomTokens {
   name: ThemeName;
@@ -21,7 +22,7 @@ declare module '@mui/material/styles' {
   }
 }
 
-const themes: Record<ThemeName, Theme> = { speakeasy, july4 };
+const themes: Record<ThemeName, Theme> = { speakeasy, july4, w00w00 };
 
 /**
  * Falls back to speakeasy for undefined (config still loading) or unknown

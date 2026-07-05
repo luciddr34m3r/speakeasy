@@ -1,6 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { getAppTheme } from '../themes';
 
+describe('w00w00 theme', () => {
+  it('uses the deck palette: ink background, bone primary, TLP red secondary', () => {
+    const t = getAppTheme('w00w00');
+    expect(t.custom.name).toBe('w00w00');
+    expect(t.palette.background.default).toBe('#0a0a0b');
+    expect(t.palette.primary.main).toBe('#f5f2ed');
+    expect(t.palette.secondary.main).toBe('#ff0033');
+    expect(t.typography.h1.fontFamily).toContain('IBM Plex Mono');
+    expect(t.custom.decorations).toBe(true);
+  });
+});
+
 describe('getAppTheme', () => {
   it('returns the speakeasy theme by name', () => {
     const theme = getAppTheme('speakeasy');
