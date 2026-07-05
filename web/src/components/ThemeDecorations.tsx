@@ -35,12 +35,12 @@ const torchGlow = keyframes`
 const REDUCED_MOTION = { '@media (prefers-reduced-motion: reduce)': { animation: 'none' } };
 
 const FIREWORKS: { left: string; top: string; src: string; size: number; delay: number }[] = [
-  { left: '-6%', top: '2%', src: '/july4/firework-gold.png', size: 300, delay: 0 },
-  { left: '55%', top: '-4%', src: '/july4/firework-redblue.png', size: 340, delay: 1.1 },
-  { left: '25%', top: '10%', src: '/july4/firework-gold.png', size: 240, delay: 2.0 },
-  { left: '70%', top: '16%', src: '/july4/firework-gold.png', size: 220, delay: 0.6 },
-  { left: '5%', top: '26%', src: '/july4/firework-redblue.png', size: 260, delay: 1.6 },
-  { left: '45%', top: '30%', src: '/july4/firework-gold.png', size: 200, delay: 2.6 },
+  { left: '-6%', top: '2%', src: '/july4/firework-gold.webp', size: 300, delay: 0 },
+  { left: '55%', top: '-4%', src: '/july4/firework-redblue.webp', size: 340, delay: 1.1 },
+  { left: '25%', top: '10%', src: '/july4/firework-gold.webp', size: 240, delay: 2.0 },
+  { left: '70%', top: '16%', src: '/july4/firework-gold.webp', size: 220, delay: 0.6 },
+  { left: '5%', top: '26%', src: '/july4/firework-redblue.webp', size: 260, delay: 1.6 },
+  { left: '45%', top: '30%', src: '/july4/firework-gold.webp', size: 200, delay: 2.6 },
 ];
 
 // Deterministic star field — no randomness in render.
@@ -92,6 +92,8 @@ export default function ThemeDecorations() {
         <Box
           key={`fw-${i}`}
           component="img"
+          fetchPriority="low"
+          decoding="async"
           src={fw.src}
           alt=""
           sx={{
@@ -131,7 +133,7 @@ export default function ThemeDecorations() {
           left: 0,
           right: 0,
           height: 52,
-          backgroundImage: 'url(/july4/bunting.png)',
+          backgroundImage: 'url(/july4/bunting.webp)',
           backgroundRepeat: 'repeat-x',
           backgroundSize: 'auto 52px',
         }}
@@ -139,7 +141,10 @@ export default function ThemeDecorations() {
       {/* Old Glory waving in both corners */}
       <Box
         component="img"
-        src="/july4/flag.png"
+        fetchPriority="low"
+        loading="lazy"
+        decoding="async"
+        src="/july4/flag.webp"
         alt=""
         sx={{
           position: 'absolute', top: 104, left: 4, width: 64,
@@ -150,7 +155,10 @@ export default function ThemeDecorations() {
       />
       <Box
         component="img"
-        src="/july4/flag.png"
+        fetchPriority="low"
+        loading="lazy"
+        decoding="async"
+        src="/july4/flag.webp"
         alt=""
         sx={{
           position: 'absolute', top: 104, right: 4, width: 64,
@@ -164,7 +172,10 @@ export default function ThemeDecorations() {
       {fullShow && (
         <Box
           component="img"
-          src="/july4/eagle.png"
+          fetchPriority="low"
+          loading="lazy"
+          decoding="async"
+          src="/july4/eagle.webp"
           alt=""
           sx={{
             position: 'absolute',
@@ -209,7 +220,10 @@ export default function ThemeDecorations() {
         />
         <Box
           component="img"
-          src="/july4/liberty.png"
+          fetchPriority="low"
+          loading="lazy"
+          decoding="async"
+          src="/july4/liberty.webp"
           alt=""
           sx={{
             width: '100%',
@@ -221,7 +235,10 @@ export default function ThemeDecorations() {
       </Box>
       <Box
         component="img"
-        src="/july4/eagle.png"
+        fetchPriority="low"
+        loading="lazy"
+        decoding="async"
+        src="/july4/eagle.webp"
         alt=""
         sx={{ position: 'absolute', bottom: 8, right: 8, width: 110, opacity: 0.7 }}
       />

@@ -68,7 +68,7 @@ export default function Menu() {
         {isJuly4 && (
           <Box
             component="img"
-            src="/july4/eagle.png"
+            src="/july4/eagle.webp"
             alt="Bald eagle"
             sx={{
               height: { xs: 150, sm: 190 },
