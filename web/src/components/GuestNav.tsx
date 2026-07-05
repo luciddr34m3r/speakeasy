@@ -57,7 +57,7 @@ export default function GuestNav() {
         <Typography
           variant="h6"
           noWrap
-          sx={{ fontFamily: '"Cormorant", serif', color: 'primary.main', cursor: 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent', flexGrow: 1, fontSize: '1.3rem' }}
+          sx={(t) => ({ fontFamily: t.typography.h5.fontFamily, color: 'primary.main', cursor: 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent', flexGrow: 1, fontSize: '1.3rem' })}
           onClick={() => navigate('/')}
         >
           The Speakeasy
