@@ -66,6 +66,8 @@ export default function ThemeDecorations() {
 
   if (!theme.custom.decorations || pathname.startsWith('/admin')) return null;
 
+  if (theme.custom.name === 'w00w00') return <W00w00Decorations menuPage={pathname === '/'} />;
+
   // The menu shows content in opaque cards, so it can take the full show.
   // Text-on-background pages (order status, history, forms) only get the
   // subtle layer or they become unreadable.
@@ -226,5 +228,99 @@ export default function ThemeDecorations() {
     </Box>
     )}
     </>
+  );
+}
+
+const HEXDUMP = [
+  '00000000  4d 5a 90 00 03 00 00 00  MZ......',
+  '00000010  04 00 00 00 ff ff 00 00  ........',
+  '00000020  b8 00 00 00 00 00 00 00  ........',
+  '00000030  00 00 00 00 00 00 00 00  ........',
+  '00000080  0e 1f ba 0e b4 09 cd 21  .......!',
+];
+
+const CORNERS = [
+  { top: 10, left: 10, borderTop: '1px solid', borderLeft: '1px solid' },
+  { top: 10, right: 10, borderTop: '1px solid', borderRight: '1px solid' },
+  { bottom: 10, left: 10, borderBottom: '1px solid', borderLeft: '1px solid' },
+  { bottom: 10, right: 10, borderBottom: '1px solid', borderRight: '1px solid' },
+] as const;
+
+/**
+ * The [w00w00] deck aesthetic: corner registration marks, a dotted
+ * timeline rule with tick marks, and a faint MZ-header hexdump. Static,
+ * monochrome, and deliberately quiet — the opposite of the July 4th show.
+ */
+function W00w00Decorations({ menuPage }: { menuPage: boolean }) {
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: -1,
+        overflow: 'hidden',
+        fontFamily: '"IBM Plex Mono", monospace',
+      }}
+    >
+      {/* Corner registration marks */}
+      {CORNERS.map((corner, i) => (
+        <Box
+          key={`reg-${i}`}
+          sx={{
+            position: 'absolute',
+            width: 22,
+            height: 22,
+            borderColor: 'rgba(245,242,237,0.35)',
+            ...corner,
+          }}
+        />
+      ))}
+      {/* Dotted timeline rule with + ticks */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 96,
+          left: 24,
+          right: 24,
+          color: 'rgba(245,242,237,0.22)',
+          fontSize: '0.6rem',
+          letterSpacing: '0.1em',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+        }}
+      >
+        {'+ · · · · · · · · '.repeat(30)}
+      </Box>
+      {/* MZ-header hexdump, bottom right (menu page only) */}
+      {menuPage && (
+        <Box sx={{ position: 'absolute', bottom: 28, right: 16, textAlign: 'left' }}>
+          {HEXDUMP.map((line) => (
+            <Box
+              key={line}
+              sx={{ color: 'rgba(110,110,115,0.28)', fontSize: '0.6rem', lineHeight: 1.7, whiteSpace: 'pre' }}
+            >
+              {line}
+            </Box>
+          ))}
+        </Box>
+      )}
+      {/* Bracket wordmark, bottom left (menu page only) */}
+      {menuPage && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 24,
+            left: 16,
+            color: 'rgba(245,242,237,0.18)',
+            fontSize: '1.4rem',
+            fontWeight: 700,
+          }}
+        >
+          [w00w00]
+        </Box>
+      )}
+    </Box>
   );
 }

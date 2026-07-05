@@ -51,7 +51,7 @@ export default function AdminNav() {
 
         <Typography
           variant="h6"
-          sx={{ fontFamily: '"Cormorant", serif', color: 'primary.main', cursor: 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent', mr: 3, flexGrow: { xs: 1, sm: 0 } }}
+          sx={(t) => ({ fontFamily: t.typography.h5.fontFamily, color: 'primary.main', cursor: 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent', mr: 3, flexGrow: { xs: 1, sm: 0 } })}
           onClick={() => navigate('/')}
         >
           Speakeasy
@@ -87,7 +87,7 @@ export default function AdminNav() {
 
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 230, pt: 1 }} role="navigation">
-          <Typography variant="h6" sx={{ fontFamily: '"Cormorant", serif', color: 'primary.main', px: 2, py: 1 }}>
+          <Typography variant="h6" sx={{ color: 'primary.main', px: 2, py: 1 }}>
             Speakeasy
           </Typography>
           <Divider />

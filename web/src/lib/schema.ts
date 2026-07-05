@@ -48,7 +48,7 @@ export const UserProfileSchema = z.object({
 });
 export type UserProfile = z.infer<typeof UserProfileSchema> & { id: string };
 
-export const ThemeNameValues = ['speakeasy', 'july4'] as const;
+export const ThemeNameValues = ['speakeasy', 'july4', 'w00w00'] as const;
 export type ThemeName = typeof ThemeNameValues[number];
 
 export const AppConfigSchema = z.object({
