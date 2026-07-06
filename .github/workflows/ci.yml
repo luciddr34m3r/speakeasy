@@ -65,7 +65,7 @@ jobs:
       - run: npm ci --prefix web
       - run: npm run test:coverage --prefix web
       - name: Upload web coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: web/coverage/lcov.info
@@ -85,7 +85,7 @@ jobs:
       - run: npm ci --prefix functions
       - run: npm run test:coverage --prefix functions
       - name: Upload functions coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: functions/coverage/lcov.info
